@@ -1,4 +1,4 @@
-﻿"""
+"""
 ThinkTank — Mode service layer.
 Each public function is the single source of truth for one ThinkTank mode.
 All AI calls go through engine.ai.chat(); all DB writes go through engine.db.

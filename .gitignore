@@ -78,6 +78,9 @@ skills*/
 threads*/
 uploads*/
 
+# Stray HTML / project files not part of ThinkTank
+3d-printer-system-inventory*.html
+
 # Old/legacy files
 thinktank2*.py
 thinktank2*.sqlite

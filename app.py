@@ -21,48 +21,24 @@ from thinktank.engine.modes import (
 )
 from thinktank import config as cfg
 
-# ── Page config ──────────────────────────────────────────────────────────────
+# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="ThinkTank", page_icon="🧠", layout="wide")
 
-# ── Browser timezone detection ───────────────────────────────────────────────
-# Reads the user's real local timezone from the browser via JS and stores it
-# in st.query_params so every timestamp shows in the user's actual local time.
-st.markdown("""
-<script>
-(function() {
-    try {
-        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        var params = new URLSearchParams(window.location.search);
-        if (params.get('tz') !== tz) {
-            params.set('tz', tz);
-            var newUrl = window.location.pathname + '?' + params.toString();
-            window.history.replaceState({}, '', newUrl);
-            window.location.reload();
-        }
-    } catch(e) {}
-})();
-</script>
-""", unsafe_allow_html=True)
-
+# Hide the Streamlit deploy button
+st.markdown(
+    "<style>div.stAppDeployButton { display: none !important; }</style>",
+    unsafe_allow_html=True,
+)
 
 # ==============================================================================
 # RENDER HELPERS
 # ==============================================================================
 def _fmt_ts(iso_str: str) -> str:
-    """Format a UTC ISO timestamp into the user's local time."""
+    """Format a UTC ISO timestamp into a readable short form."""
     from datetime import datetime
-    import zoneinfo
     try:
-        dt_utc = datetime.fromisoformat(iso_str)
-        tz_name = st.query_params.get("tz", "")
-        if tz_name and tz_name in zoneinfo.available_timezones():
-            dt_local = dt_utc.astimezone(zoneinfo.ZoneInfo(tz_name))
-            label = f" ({tz_name})"
-        else:
-            dt_local = dt_utc.astimezone()
-            label = ""
-        formatted = dt_local.strftime("%b %d, %I:%M %p").replace(" 0", " ")
-        return formatted + label
+        dt = datetime.fromisoformat(iso_str)
+        return dt.strftime("%b %d, %I:%M %p").replace(" 0", " ")
     except Exception:
         return iso_str
 
@@ -176,17 +152,6 @@ def _render_critique(d):
         st.markdown(f"**Next step:** {ns}")
 
 
-def _render_output(d):
-    if d is None:
-        st.caption("No output yet.")
-        return
-    d = _safe_parse(d)
-    if isinstance(d, dict):
-        st.json(d)
-    else:
-        st.text(str(d))
-
-
 def _render_bounce(d):
     if d is None:
         return
@@ -241,6 +206,7 @@ def _render_bounce(d):
         with fc2:
             st.markdown(f"**Unknowns:** {feas.get('unknowns', '—')}")
             st.markdown(f"**Next step:** {feas.get('next_step', '—')}")
+
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 init_db()
@@ -299,6 +265,7 @@ with st.sidebar:
         st.caption("No gate history yet.")
 
     st.divider()
+    # Single, clean donation widget
     st.markdown(
         """
         <div style="text-align:center;padding:10px 0 4px;">
@@ -312,33 +279,6 @@ with st.sidebar:
                 &#x2665; Donate via PayPal
             </a>
             <div style="font-size:0.65rem;color:#555;margin-top:6px;">paypal.me/CDovico</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.divider()
-    st.markdown("### \u2665 Support the Creator")
-    st.markdown(
-        """
-        <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;
-                    padding:24px 28px;text-align:center;max-width:480px;margin:0 auto;">
-            <div style="font-size:1.05rem;font-weight:700;color:#f0f0f0;margin-bottom:6px;">
-                Chris Dovico
-            </div>
-            <div style="font-size:0.85rem;color:#888;margin-bottom:18px;line-height:1.6;">
-                ThinkTank is free and open-source. If it saves you time or helps your team
-                make better decisions, consider buying me a coffee.
-            </div>
-            <a href="https://paypal.me/CDovico" target="_blank" rel="noopener"
-               style="display:inline-block;background:#003087;color:#fff;
-                      text-decoration:none;font-size:0.9rem;font-weight:700;
-                      padding:12px 36px;border-radius:6px;letter-spacing:0.05em;">
-                &#x2665;&nbsp; Donate via PayPal
-            </a>
-            <div style="font-size:0.72rem;color:#555;margin-top:10px;">
-                paypal.me/CDovico &nbsp;&#x2022;&nbsp; Any amount is appreciated
-            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -391,11 +331,12 @@ with tab_ideas:
         if idea:
             st.markdown(f"**Idea #{idea['id']}**")
             st.write(idea["text"])
-            st.caption(f"Created: {idea['created_at']}")
+            st.caption(f"Created: {_fmt_ts(idea['created_at'])}")
 
             lg = get_latest_gate_for_idea(sel)
             if lg:
-                st.info(f"Latest Gate: {lg['signal']} {lg['verdict']} | "
+                em = {"OK": "✅", "CAUTION": "⚠️", "STOP": "❌"}.get(lg["signal"], "❓")
+                st.info(f"Latest Gate: {em} {lg['signal']} — {lg['verdict']} | "
                         f"I{lg['impact']}/E{lg['effort']}/R{lg['risk']}/N{lg['novelty']}")
 
             if st.button("🗑️ Delete Selected Idea"):
@@ -581,8 +522,8 @@ with tab_gate:
 with tab_ask:
     st.subheader("Ask / Chat")
 
-    chats     = chat_list(limit=50)
-    chat_id   = st.session_state.current_chat_id
+    chats   = chat_list(limit=50)
+    chat_id = st.session_state.current_chat_id
 
     if chats:
         labels  = [f"Chat#{c['id']} - {c['title']}" for c in chats]
@@ -594,10 +535,10 @@ with tab_ask:
 
     nc1, nc2 = st.columns([3, 1])
     with nc1:
-        new_title = st.text_input("New Chat Title")
+        new_title = st.text_input("New Chat Title", placeholder="e.g. Strategy session")
     with nc2:
         st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
-        if st.button("➕ New", use_container_width=True):
+        if st.button("➕ New Chat", use_container_width=True):
             if new_title.strip():
                 new_id = chat_new(new_title.strip())
                 st.session_state.current_chat_id = new_id
@@ -607,13 +548,33 @@ with tab_ask:
                 st.warning("Enter a title.")
 
     if chat_id:
-        if st.button("🗑️ Delete This Chat", use_container_width=False):
-            if chat_delete(chat_id):
-                st.success("Chat deleted.")
-                st.session_state.current_chat_id = ensure_default_chat()
-                st.rerun()
+        dc1, dc2 = st.columns([1, 4])
+        with dc1:
+            if st.button("🗑️ Delete This Chat"):
+                if chat_delete(chat_id):
+                    st.success("Chat deleted.")
+                    st.session_state.current_chat_id = ensure_default_chat()
+                    st.rerun()
+        with dc2:
+            # Transcript download for this chat
+            messages_all = chat_get_messages(chat_id, limit=100000) if chat_id else []
+            if messages_all:
+                lines = [f"ThinkTank Chat Transcript", "=" * 40, ""]
+                for m in messages_all:
+                    ts = _fmt_ts(m["created_at"])
+                    lines.append(f"[{ts}] {m['role'].upper()}")
+                    lines.append(m["content"])
+                    lines.append("")
+                lines.append(f"--- End ({len(messages_all)} messages) ---")
+                transcript_txt = "\n".join(lines)
+                st.download_button(
+                    label="📄 Download Transcript",
+                    data=transcript_txt.encode("utf-8"),
+                    file_name=f"thinktank_chat_{chat_id}.txt",
+                    mime="text/plain",
+                )
 
-    st.markdown(f"**Active Chat:** `{chat_id}`")
+    st.divider()
 
     messages = chat_get_messages(chat_id, limit=30) if chat_id else []
     if messages:
@@ -624,7 +585,8 @@ with tab_ask:
     else:
         st.caption("No messages yet — ask something below.")
 
-    ask_text = st.text_area("Ask something", height=120, key="ask_input")
+    ask_text = st.text_area("Ask something", height=120, key="ask_input",
+                            placeholder="Ask ThinkTank anything…")
     a1, a2, a3 = st.columns(3)
 
     with a1:
@@ -632,8 +594,7 @@ with tab_ask:
             if ask_text.strip() and chat_id:
                 with st.spinner("Thinking…"):
                     try:
-                        response = run_ask(ask_text.strip(), chat_id)
-                        st.success("Response added to chat.")
+                        run_ask(ask_text.strip(), chat_id)
                         st.rerun()
                     except Exception as e:
                         err = str(e)
@@ -725,6 +686,34 @@ with tab_admin:
 
     st.divider()
 
+    st.markdown("### ♥ Support the Creator")
+    st.markdown(
+        """
+        <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;
+                    padding:24px 28px;text-align:center;max-width:480px;margin:0 auto;">
+            <div style="font-size:1.05rem;font-weight:700;color:#f0f0f0;margin-bottom:6px;">
+                Chris Dovico
+            </div>
+            <div style="font-size:0.85rem;color:#888;margin-bottom:18px;line-height:1.6;">
+                ThinkTank is free and open-source. If it saves you time or helps your team
+                make better decisions, consider buying me a coffee.
+            </div>
+            <a href="https://paypal.me/CDovico" target="_blank" rel="noopener"
+               style="display:inline-block;background:#003087;color:#fff;
+                      text-decoration:none;font-size:0.9rem;font-weight:700;
+                      padding:12px 36px;border-radius:6px;letter-spacing:0.05em;">
+                &#x2665;&nbsp; Donate via PayPal
+            </a>
+            <div style="font-size:0.72rem;color:#555;margin-top:10px;">
+                paypal.me/CDovico &nbsp;&bull;&nbsp; Any amount is appreciated
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+
     st.markdown("### 📋 All Gate History")
     all_gates = list_gate_history(limit=50)
     if all_gates:
@@ -739,8 +728,3 @@ with tab_admin:
                     st.caption(row["recommended_action"])
     else:
         st.caption("No gate history yet.")
-
-
-
-
-

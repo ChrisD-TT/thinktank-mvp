@@ -1,4 +1,4 @@
-﻿"""
+"""
 ThinkTank — Gate decision engine.
 Pure function: takes score + critique dicts, returns a gate verdict dict.
 All thresholds are read from config so they can be tuned without code changes.

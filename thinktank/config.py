@@ -1,4 +1,4 @@
-﻿"""
+"""
 ThinkTank — Central configuration.
 All tunables live here. No secrets required (Ollama is local).
 """
