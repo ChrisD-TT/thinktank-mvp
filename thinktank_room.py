@@ -645,28 +645,15 @@ def run_room_app():
                     f'</div></div>'
                 )
 
+            # flex-direction:column + justify-content:flex-end pushes messages
+            # to the bottom naturally — no JS needed (Streamlit strips scripts anyway).
             st.markdown(
-                f"""
-                <div id="tt-chat-box" style="
-                    height: 68vh;
-                    overflow-y: auto;
-                    display: flex;
-                    flex-direction: column;
-                    padding: 0.5rem 0.25rem;
-                    border: 1px solid #30363d;
-                    border-radius: 8px;
-                    background: #0d1117;
-                ">
-                    {cards_html}
-                    <div id="tt-chat-bottom"></div>
-                </div>
-                <script>
-                    (function() {{
-                        var box = document.getElementById('tt-chat-box');
-                        if (box) {{ box.scrollTop = box.scrollHeight; }}
-                    }})();
-                </script>
-                """,
+                f'<div style="'
+                f'height:68vh;overflow-y:auto;display:flex;flex-direction:column;'
+                f'justify-content:flex-end;padding:0.5rem 0.25rem;'
+                f'border:1px solid #30363d;border-radius:8px;background:#0d1117;">'
+                f'{cards_html}'
+                f'</div>',
                 unsafe_allow_html=True,
             )
         if st.button("🔄 Refresh", use_container_width=False):
