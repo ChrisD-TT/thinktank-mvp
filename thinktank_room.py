@@ -600,62 +600,48 @@ def run_room_app():
                     use_container_width=True,
                 )
 
-        posts = visible
-
-        # Build all post cards as one HTML block inside a chat-style scroll container.
-        # flex-direction: column keeps oldest at top, newest at bottom.
-        # The outer wrapper uses overflow-y:auto + max-height so it scrolls.
-        # A zero-height anchor div at the bottom + JS scrollIntoView snaps to newest.
         if not posts:
             st.info("The table is empty. Post an idea to start.")
         else:
-            cards_html = ""
-            for p in posts:
-                is_dealer = p["author"] == DEALER_NAME
-                is_idea   = p["post_type"] == "idea"
-                is_gate   = p["post_type"] == "gate"
-                is_vote   = p["post_type"] == "vote"
-                is_ask    = p["post_type"] == "ask"
-                if is_dealer or is_gate:
-                    bg, border = "#1e1433", "#7c5cd8"
-                elif is_idea:
-                    bg, border = "#0d2318", "#2da44e"
-                elif is_vote:
-                    bg, border = "#1a2030", "#3b82d4"
-                elif is_ask:
-                    bg, border = "#1a2030", "#e3b341"
-                else:
-                    bg, border = "#161b22", "#444444"
-                icon = ("🤖" if is_dealer else
-                        "🚦" if is_gate else
-                        "💡" if is_idea else
-                        "🗳️" if is_vote else
-                        "❓" if is_ask else "💬")
-                ts           = p["created_at"][11:16]
-                safe_content = _html.escape(p["content"]).replace("\n", "<br>")
-                safe_author  = _html.escape(p["author"])
-                cards_html += (
-                    f'<div style="background:{bg};border-left:3px solid {border};'
-                    f'padding:0.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:0.6rem;">'
-                    f'<div style="font-size:0.72rem;color:#aaaaaa;font-weight:600;margin-bottom:0.3rem;">'
-                    f'{icon} {safe_author} &middot; {p["post_type"]} &middot; {ts}'
-                    f'</div>'
-                    f'<div style="font-size:0.9rem;color:#e6edf3;line-height:1.6;">'
-                    f'{safe_content}'
-                    f'</div></div>'
-                )
+            # Use Streamlit's native scrollable container — reliable scroll + no flash
+            chat_box = st.container(height=540, border=False)
+            with chat_box:
+                for p in posts:
+                    is_dealer = p["author"] == DEALER_NAME
+                    is_idea   = p["post_type"] == "idea"
+                    is_gate   = p["post_type"] == "gate"
+                    is_vote   = p["post_type"] == "vote"
+                    is_ask    = p["post_type"] == "ask"
+                    if is_dealer or is_gate:
+                        bg, border = "#1e1433", "#7c5cd8"
+                    elif is_idea:
+                        bg, border = "#0d2318", "#2da44e"
+                    elif is_vote:
+                        bg, border = "#1a2030", "#3b82d4"
+                    elif is_ask:
+                        bg, border = "#1a2030", "#e3b341"
+                    else:
+                        bg, border = "#161b22", "#444444"
+                    icon = ("🤖" if is_dealer else
+                            "🚦" if is_gate else
+                            "💡" if is_idea else
+                            "🗳️" if is_vote else
+                            "❓" if is_ask else "💬")
+                    ts           = p["created_at"][11:16]
+                    safe_content = _html.escape(p["content"]).replace("\n", "<br>")
+                    safe_author  = _html.escape(p["author"])
+                    st.markdown(
+                        f'<div style="background:{bg};border-left:3px solid {border};'
+                        f'padding:0.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:0.6rem;">'
+                        f'<div style="font-size:0.72rem;color:#aaaaaa;font-weight:600;margin-bottom:0.3rem;">'
+                        f'{icon} {safe_author} &middot; {p["post_type"]} &middot; {ts}'
+                        f'</div>'
+                        f'<div style="font-size:0.9rem;color:#e6edf3;line-height:1.6;">'
+                        f'{safe_content}'
+                        f'</div></div>',
+                        unsafe_allow_html=True,
+                    )
 
-            # flex-direction:column + justify-content:flex-end pushes messages
-            # to the bottom naturally — no JS needed (Streamlit strips scripts anyway).
-            st.markdown(
-                f'<div style="'
-                f'height:68vh;overflow-y:auto;display:flex;flex-direction:column;'
-                f'justify-content:flex-end;padding:0.5rem 0.25rem;'
-                f'border:1px solid #30363d;border-radius:8px;background:#0d1117;">'
-                f'{cards_html}'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
         if st.button("🔄 Refresh", use_container_width=False):
             st.rerun()
 
