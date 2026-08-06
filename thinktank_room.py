@@ -393,6 +393,17 @@ def run_room_app():
     st.markdown("## 🎲 ThinkTank Room")
     st.caption("Collaborative design session — 5 seats + 1 AI dealer")
 
+    # Quick Ollama health check — show a banner if offline
+    from thinktank.engine.ai import is_available
+    from thinktank import config as cfg
+    _ollama_ok, _ollama_msg = is_available(cfg.OLLAMA_MODEL)
+    if not _ollama_ok:
+        st.error(
+            f"🔌 **Ollama is offline** — AI dealer responses are disabled.  \n"
+            f"Run `ollama serve` in a terminal, then refresh this page.  \n"
+            f"_(Model: `{cfg.OLLAMA_MODEL}`)_"
+        )
+
     # ── Rules expander ────────────────────────────────────────────────────────
     with st.expander("📋  Rules to the ThinkTank Group Messaging Board", expanded=False):
         st.markdown(
@@ -716,12 +727,16 @@ def run_room_app():
                         )
                         with st.spinner("Dealer is reviewing the idea…"):
                             dealer_text = dealer_respond(room["id"], trigger)
+                        if "AI backend unavailable" in dealer_text:
+                            st.error("🔌 Ollama is offline — start it with `ollama serve` then post again.")
                         add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
 
                     elif post_type == "ask":
                         trigger = f'{me} asked: "{content}"'
                         with st.spinner("Dealer is thinking…"):
                             dealer_text = dealer_respond(room["id"], trigger)
+                        if "AI backend unavailable" in dealer_text:
+                            st.error("🔌 Ollama is offline — start it with `ollama serve` then post again.")
                         add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
 
                     # message type — no AI, just posts to the board
