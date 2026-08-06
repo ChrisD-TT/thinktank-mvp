@@ -669,14 +669,7 @@ def run_room_app():
                 """,
                 unsafe_allow_html=True,
             )
-        # Auto-refresh every 8 seconds when inside a room
-        try:
-            from streamlit_autorefresh import st_autorefresh
-            st_autorefresh(interval=3000, limit=None, key="room_autorefresh")
-        except ImportError:
-            pass  # optional dependency — falls back to manual refresh
-
-        if st.button("🔄 Refresh table"):
+        if st.button("🔄 Refresh", use_container_width=False):
             st.rerun()
 
     with post_col:
