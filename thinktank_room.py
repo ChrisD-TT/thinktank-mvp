@@ -590,44 +590,74 @@ def run_room_app():
                 )
 
         posts = visible
-        for p in posts:
-            is_dealer = p["author"] == DEALER_NAME
-            is_idea   = p["post_type"] == "idea"
-            is_gate   = p["post_type"] == "gate"
-            is_vote   = p["post_type"] == "vote"
-            is_ask    = p["post_type"] == "ask"
-            if is_dealer or is_gate:
-                bg, border = "#1e1433", "#7c5cd8"
-            elif is_idea:
-                bg, border = "#0d2318", "#2da44e"
-            elif is_vote:
-                bg, border = "#1a2030", "#3b82d4"
-            elif is_ask:
-                bg, border = "#1a2030", "#e3b341"
-            else:
-                bg, border = "#1a1a1a", "#444444"
-            icon = ("🤖" if is_dealer else
-                    "🚦" if is_gate else
-                    "💡" if is_idea else
-                    "🗳️" if is_vote else
-                    "❓" if is_ask else "💬")
-            ts           = p["created_at"][11:16]
-            safe_content = _html.escape(p["content"]).replace("\n", "<br>")
-            safe_author  = _html.escape(p["author"])
-            st.markdown(
-                f"""<div style="background:{bg};border-left:3px solid {border};
-                    padding:0.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:0.6rem;">
-                    <div style="font-size:0.72rem;color:#aaaaaa;font-weight:600;margin-bottom:0.3rem;">
-                    {icon} {safe_author} &middot; {p['post_type']} &middot; {ts}
-                    </div>
-                    <div style="font-size:0.9rem;color:#f0f0f0;line-height:1.6;">
-                    {safe_content}
-                    </div>
-                </div>""",
-                unsafe_allow_html=True,
-            )
+
+        # Build all post cards as one HTML block inside a chat-style scroll container.
+        # flex-direction: column keeps oldest at top, newest at bottom.
+        # The outer wrapper uses overflow-y:auto + max-height so it scrolls.
+        # A zero-height anchor div at the bottom + JS scrollIntoView snaps to newest.
         if not posts:
             st.info("The table is empty. Post an idea to start.")
+        else:
+            cards_html = ""
+            for p in posts:
+                is_dealer = p["author"] == DEALER_NAME
+                is_idea   = p["post_type"] == "idea"
+                is_gate   = p["post_type"] == "gate"
+                is_vote   = p["post_type"] == "vote"
+                is_ask    = p["post_type"] == "ask"
+                if is_dealer or is_gate:
+                    bg, border = "#1e1433", "#7c5cd8"
+                elif is_idea:
+                    bg, border = "#0d2318", "#2da44e"
+                elif is_vote:
+                    bg, border = "#1a2030", "#3b82d4"
+                elif is_ask:
+                    bg, border = "#1a2030", "#e3b341"
+                else:
+                    bg, border = "#161b22", "#444444"
+                icon = ("🤖" if is_dealer else
+                        "🚦" if is_gate else
+                        "💡" if is_idea else
+                        "🗳️" if is_vote else
+                        "❓" if is_ask else "💬")
+                ts           = p["created_at"][11:16]
+                safe_content = _html.escape(p["content"]).replace("\n", "<br>")
+                safe_author  = _html.escape(p["author"])
+                cards_html += (
+                    f'<div style="background:{bg};border-left:3px solid {border};'
+                    f'padding:0.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:0.6rem;">'
+                    f'<div style="font-size:0.72rem;color:#aaaaaa;font-weight:600;margin-bottom:0.3rem;">'
+                    f'{icon} {safe_author} &middot; {p["post_type"]} &middot; {ts}'
+                    f'</div>'
+                    f'<div style="font-size:0.9rem;color:#e6edf3;line-height:1.6;">'
+                    f'{safe_content}'
+                    f'</div></div>'
+                )
+
+            st.markdown(
+                f"""
+                <div id="tt-chat-box" style="
+                    height: 68vh;
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
+                    padding: 0.5rem 0.25rem;
+                    border: 1px solid #30363d;
+                    border-radius: 8px;
+                    background: #0d1117;
+                ">
+                    {cards_html}
+                    <div id="tt-chat-bottom"></div>
+                </div>
+                <script>
+                    (function() {{
+                        var box = document.getElementById('tt-chat-box');
+                        if (box) {{ box.scrollTop = box.scrollHeight; }}
+                    }})();
+                </script>
+                """,
+                unsafe_allow_html=True,
+            )
         # Auto-refresh every 8 seconds when inside a room
         try:
             from streamlit_autorefresh import st_autorefresh
