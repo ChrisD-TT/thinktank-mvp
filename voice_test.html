@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Voice Diagnostic</title>
+<style>
+  body{background:#060d1e;color:#e2e8f0;font-family:system-ui,sans-serif;padding:40px;max-width:700px;margin:0 auto}
+  h1{color:#34d399;margin-bottom:8px;font-size:1.4rem}
+  p{color:#64748b;margin-bottom:20px;font-size:.85rem}
+  button{background:#1d4ed8;color:#fff;border:none;padding:11px 20px;border-radius:6px;font-size:13px;cursor:pointer;margin:4px 3px;font-family:inherit}
+  button:hover{background:#2563eb}
+  .green{background:#059669!important}.red{background:#dc2626!important}
+  #log{background:#020810;border:1px solid #0d1e35;border-radius:8px;padding:16px;margin-top:20px;font-family:monospace;font-size:12px;line-height:1.9;min-height:180px;max-height:420px;overflow-y:auto}
+  .ok{color:#34d399}.warn{color:#fbbf24}.err{color:#f87171}.info{color:#60a5fa}
+  #voice-list{margin-top:16px;background:#020810;border:1px solid #0d1e35;border-radius:8px;padding:14px;font-size:12px;max-height:200px;overflow-y:auto}
+  .vi{padding:3px 0;border-bottom:1px solid #071020;color:#94a3b8;font-family:monospace;font-size:11px}
+  .vi.best{color:#34d399;font-weight:700}
+  hr{border:none;border-top:1px solid #0d1e35;margin:20px 0}
+</style>
+</head>
+<body>
+<h1>ThinkTank AI — Voice Diagnostic</h1>
+<p>Run this before the main demo. Click Run Diagnostic first, then Test Speak to confirm audio.</p>
+
+<button class="green" onclick="runDiag()">Run Full Diagnostic</button>
+<button onclick="testSpeak()">Test Speak (short)</button>
+<button onclick="testSpeakLong()">Test Speak (full act)</button>
+<button onclick="listVoices()">List All Voices</button>
+<button class="red" onclick="window.speechSynthesis.cancel();L('Cancelled.','warn')">Stop</button>
+
+<div id="log"><span class="info">Ready. Click Run Full Diagnostic.</span></div>
+<hr>
+<div id="voice-list" style="display:none"></div>
+
+<script>
+var log = document.getElementById('log');
+
+function L(msg, cls){
+  var d = document.createElement('div');
+  d.className = cls || 'info';
+  d.innerHTML = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+// FIXED: word-boundary regex so "Aria" never matches "Borislav" etc.
+function pickBestVoice(voices){
+  return voices.find(function(v){ return /\bAria\b/.test(v.name)  && v.lang.indexOf('en') === 0; }) ||
+         voices.find(function(v){ return /\bJenny\b/.test(v.name) && v.lang.indexOf('en') === 0; }) ||
+         voices.find(function(v){ return /\bAna\b/.test(v.name)   && v.lang.indexOf('en') === 0; }) ||
+         voices.find(function(v){ return /\bZira\b/.test(v.name)  && v.lang.indexOf('en') === 0; }) ||
+         voices.find(function(v){ return v.lang === 'en-US'; }) ||
+         voices.find(function(v){ return v.lang.indexOf('en') === 0; }) ||
+         voices[0] || null;
+}
+
+function listVoices(){
+  var vl = document.getElementById('voice-list');
+  vl.style.display = 'block';
+  vl.innerHTML = '';
+  var voices = window.speechSynthesis.getVoices();
+  L('Total voices: ' + voices.length, voices.length ? 'ok' : 'err');
+  var best = pickBestVoice(voices);
+  voices.forEach(function(v){
+    var d = document.createElement('div');
+    var isBest = (best && v.name === best.name);
+    d.className = 'vi' + (isBest ? ' best' : '');
+    d.textContent = (isBest ? '>> SELECTED: ' : '   ') + v.name + '  [' + v.lang + ']' + (v.localService ? ' (local)' : '');
+    vl.appendChild(d);
+  });
+}
+
+function testSpeak(){
+  if(!window.speechSynthesis){ L('ERROR: speechSynthesis not available!','err'); return; }
+  window.speechSynthesis.cancel();
+  var voices = window.speechSynthesis.getVoices();
+  var voice = pickBestVoice(voices);
+  L('Voice: ' + (voice ? voice.name + ' [' + voice.lang + ']' : 'NONE FOUND'), voice ? 'ok' : 'err');
+  var u = new SpeechSynthesisUtterance('I am ThinkTank AI. Voice test successful.');
+  u.rate = 0.85; u.pitch = 1.0; u.volume = 1.0;
+  if(voice) u.voice = voice;
+  u.onstart = function(){ L('STARTED — you should hear this now!', 'ok'); };
+  u.onend   = function(){ L('ENDED normally — voice is working!', 'ok'); };
+  u.onerror = function(e){ L('ERROR: ' + e.error, 'err'); };
+  setTimeout(function(){ window.speechSynthesis.speak(u); }, 100);
+}
+
+function testSpeakLong(){
+  if(!window.speechSynthesis){ L('ERROR: speechSynthesis not available!','err'); return; }
+  window.speechSynthesis.cancel();
+  var voices = window.speechSynthesis.getVoices();
+  var voice = pickBestVoice(voices);
+  L('Voice: ' + (voice ? voice.name + ' [' + voice.lang + ']' : 'NONE'), voice ? 'ok' : 'err');
+  var text = 'Surge detected. Plus 68 volts overflow. A traditional system would ground this and lose it forever. I am capturing it now and routing it through the supercharger before it reaches the capacitor bank.';
+  L('Speaking ' + text.split(' ').length + ' words...', 'info');
+  var u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.85; u.pitch = 1.0; u.volume = 1.0;
+  if(voice) u.voice = voice;
+  u.onstart = function(){ L('Long speech STARTED', 'ok'); };
+  u.onend   = function(){ L('Long speech ENDED normally', 'ok'); };
+  u.onerror = function(e){ L('Long speech ERROR: ' + e.error, 'err'); };
+  setTimeout(function(){ window.speechSynthesis.speak(u); }, 100);
+}
+
+function runDiag(){
+  log.innerHTML = '';
+  L('=== ThinkTank AI Voice Diagnostic ===', 'info');
+
+  if(!window.speechSynthesis){
+    L('FAIL: speechSynthesis not available in this browser.', 'err');
+    return;
+  }
+  L('PASS: speechSynthesis available', 'ok');
+  L('Speaking: ' + window.speechSynthesis.speaking, 'info');
+  L('Paused:   ' + window.speechSynthesis.paused, 'info');
+
+  var voices = window.speechSynthesis.getVoices();
+  L('Voices now: ' + voices.length, voices.length ? 'ok' : 'warn');
+
+  if(voices.length === 0){
+    L('Voices not ready yet — waiting for onvoiceschanged...', 'warn');
+    window.speechSynthesis.onvoiceschanged = function(){
+      var v2 = window.speechSynthesis.getVoices();
+      L('onvoiceschanged fired: ' + v2.length + ' voices', v2.length ? 'ok' : 'err');
+      if(v2.length) doVoiceCheck(v2);
+    };
+    [500,1000,2000].forEach(function(ms){
+      setTimeout(function(){
+        var vx = window.speechSynthesis.getVoices();
+        L('Retry ' + ms + 'ms: ' + vx.length + ' voices', vx.length ? 'ok' : 'warn');
+        if(vx.length) doVoiceCheck(vx);
+      }, ms);
+    });
+  } else {
+    doVoiceCheck(voices);
+  }
+}
+
+function doVoiceCheck(voices){
+  // Check with proper word-boundary matching
+  var aria  = voices.find(function(v){ return /\bAria\b/.test(v.name)  && v.lang.indexOf('en') === 0; });
+  var jenny = voices.find(function(v){ return /\bJenny\b/.test(v.name) && v.lang.indexOf('en') === 0; });
+  var enUS  = voices.find(function(v){ return v.lang === 'en-US'; });
+
+  L('Microsoft Aria (English):  ' + (aria  ? aria.name  + ' [' + aria.lang  + ']' : 'NOT FOUND'), aria  ? 'ok' : 'warn');
+  L('Microsoft Jenny (English): ' + (jenny ? jenny.name + ' [' + jenny.lang + ']' : 'NOT FOUND'), jenny ? 'ok' : 'warn');
+  L('en-US fallback: ' + (enUS ? enUS.name : 'none'), 'info');
+
+  var best = aria || jenny || enUS || voices[0];
+  if(!best){ L('CRITICAL: No usable voice found!', 'err'); return; }
+  L('SELECTED: ' + best.name + ' [' + best.lang + ']', 'ok');
+
+  L('Firing test utterance...', 'info');
+  window.speechSynthesis.cancel();
+  setTimeout(function(){
+    var u = new SpeechSynthesisUtterance('Diagnostic complete. ThinkTank AI voice is working correctly.');
+    u.voice = best; u.rate = 0.85; u.pitch = 1.0; u.volume = 1.0;
+    u.onstart = function(){ L('TEST STARTED — you should hear audio now!', 'ok'); };
+    u.onend   = function(){ L('TEST ENDED — voice fully working!', 'ok'); };
+    u.onerror = function(e){ L('TEST ERROR: "' + e.error + '"', 'err'); };
+    window.speechSynthesis.speak(u);
+  }, 200);
+}
+</script>
+</body>
+</html>

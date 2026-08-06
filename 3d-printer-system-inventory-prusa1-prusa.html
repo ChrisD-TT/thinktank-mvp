@@ -1,0 +1,298 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>3D Printer System Inventory</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    background: #ffffff;
+    color: #1f2328;
+    padding: 40px 20px;
+  }
+  .page { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle {
+    font-size: 13px;
+    color: #57606a;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .main-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 28px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .main-table thead tr { background: #1f2328; color: #ffffff; }
+  .main-table thead th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .main-table thead th:first-child {
+    width: 30%;
+    color: #9ca3af;
+    font-weight: 500;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .main-table thead th.p1 { background: #3b82d4; width: 35%; }
+  .main-table thead th.p2 { background: #7c5cd8; width: 35%; }
+  .section-row td {
+    background: #f7f8fa;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #57606a;
+    padding: 7px 16px;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .main-table tbody tr:not(.section-row) td {
+    padding: 7px 16px;
+    border-bottom: 1px solid #f0f1f3;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .main-table tbody tr:last-child td { border-bottom: none; }
+  .main-table tbody tr:not(.section-row) td:first-child {
+    color: #57606a;
+    font-size: 12px;
+  }
+  .shared {
+    display: inline-block;
+    background: #e8f0fb;
+    color: #3b82d4;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 1px 7px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+    text-transform: uppercase;
+  }
+  .cred {
+    font-family: "Consolas", "Courier New", monospace;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .cred.p1 { color: #3b82d4; }
+  .cred.p2 { color: #7c5cd8; }
+  .cred.same { color: #1f2328; }
+  .url-val {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+    color: #3b82d4;
+  }
+  .url-val.p2 { color: #7c5cd8; }
+  .same-row td:not(:first-child) { background: #fafbff; }
+  .unified-banner {
+    background: #e8f4e8;
+    border: 1px solid #b6d9b6;
+    border-radius: 6px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #2d6a2d;
+  }
+  .unified-banner strong { display: block; margin-bottom: 4px; color: #1a4a1a; }
+  .note {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: #57606a;
+  }
+  .note strong { color: #1f2328; display: block; margin-bottom: 4px; }
+  .note ul { margin: 6px 0 0 18px; }
+  .note ul li { margin-bottom: 2px; }
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+    font-size: 12px;
+    color: #57606a;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>3D Printer System Inventory</h1>
+  <div class="subtitle">PRUSA1 &amp; PRUSA2 — OctoPrint Access Reference  |  Revision 1.3  |  Controlled Document</div>
+
+  <div class="unified-banner">
+    <strong>✓ Credentials unified — Revision 1.3</strong>
+    All OctoPrint web logins and all Linux SSH logins now use the same username and password across both printers. Verified working on both systems.
+  </div>
+
+  <table class="main-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="p1">PRUSA1</th>
+        <th class="p2">PRUSA2</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      
+      <tr class="section-row"><td colspan="3">Identity</td></tr>
+      <tr>
+        <td>Printer name</td>
+        <td><span class="status-dot"></span>PRUSA1</td>
+        <td><span class="status-dot"></span>PRUSA2</td>
+      </tr>
+      <tr>
+        <td>Pi hostname</td>
+        <td>Prusa1</td>
+        <td>octopi</td>
+      </tr>
+      <tr>
+        <td>OctoPrint version</td>
+        <td>1.11.6</td>
+        <td>1.9.3</td>
+      </tr>
+      <tr>
+        <td>OctoPi version</td>
+        <td>0.18.0</td>
+        <td>1.0.0</td>
+      </tr>
+
+      
+      <tr class="section-row"><td colspan="3">Network</td></tr>
+      <tr>
+        <td>Primary URL</td>
+        <td><span class="url-val">http://9.57.26.93</span></td>
+        <td><span class="url-val p2">http://9.57.26.221</span></td>
+      </tr>
+      <tr>
+        <td>Alternate URL</td>
+        <td><span class="url-val">http://Prusa1.local</span></td>
+        <td><span class="url-val p2">http://octopi.local</span></td>
+      </tr>
+      <tr>
+        <td>IP address</td>
+        <td>9.57.26.93</td>
+        <td>9.57.26.221</td>
+      </tr>
+      <tr class="same-row">
+        <td>Subnet <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center;color:#57606a">9.57.26.0/24</td>
+      </tr>
+      <tr class="same-row">
+        <td>Gateway <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center;color:#57606a">9.57.26.1</td>
+      </tr>
+      <tr class="same-row">
+        <td>Interface <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center;color:#57606a">eth0 (wired)</td>
+      </tr>
+      <tr class="same-row">
+        <td>WiFi <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center;color:#57606a">Disabled  |  OpenVPN: Connected</td>
+      </tr>
+
+      
+      <tr class="section-row"><td colspan="3">Linux SSH — Command Line Access</td></tr>
+      <tr class="same-row">
+        <td>Username <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center"><span class="cred same">pi</span></td>
+      </tr>
+      <tr class="same-row">
+        <td>Password <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center"><span class="cred same">bananapi</span></td>
+      </tr>
+      <tr class="same-row">
+        <td>SSH command <span class="shared">same pattern</span></td>
+        <td><span class="url-val">ssh pi@9.57.26.93</span></td>
+        <td><span class="url-val p2">ssh pi@9.57.26.221</span></td>
+      </tr>
+
+      
+      <tr class="section-row"><td colspan="3">OctoPrint Web — Browser Access</td></tr>
+      <tr class="same-row">
+        <td>Username <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center"><span class="cred same">memlab</span></td>
+      </tr>
+      <tr class="same-row">
+        <td>Password <span class="shared">same</span></td>
+        <td colspan="2" style="text-align:center"><span class="cred same">applepi</span></td>
+      </tr>
+
+      
+      <tr class="section-row"><td colspan="3">Hardware Notes</td></tr>
+      <tr>
+        <td>Filament loaded</td>
+        <td>3DXTECH ESD-PETG Black 1.75mm</td>
+        <td>3DXTECH ESD-PETG Black 1.75mm</td>
+      </tr>
+      <tr>
+        <td>Silicone sock</td>
+        <td style="color:#c0392b">Missing — schedule replacement</td>
+        <td>Present</td>
+      </tr>
+      <tr>
+        <td>Python version</td>
+        <td style="color:#c0392b">3.7.3 — end of life, upgrade needed</td>
+        <td>Current</td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>Account distinction — read this first</strong>
+    There are two separate logins on each system. They are not interchangeable.
+    <ul>
+      <li><strong>Linux SSH</strong> — command-line access to the Raspberry Pi. Used for maintenance and password recovery only. Username: pi / Password: bananapi</li>
+      <li><strong>OctoPrint web</strong> — browser login to the printer dashboard. Day-to-day login. Username: memlab / Password: applepi</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <strong>VPN / external access warning</strong>
+    When connecting over VPN, OctoPrint may show a warning about possible external access. This is a false positive. Both printers are confirmed on the IBM internal network (9.57.26.0/24). Click <strong>Ignore</strong> to dismiss and proceed normally.
+  </div>
+
+  <div class="note">
+    <strong>Outstanding maintenance items</strong>
+    <ul>
+      <li>PRUSA1 — silicone sock missing, order E3D V6 silicone sock replacement</li>
+      <li>PRUSA1 — Python 3.7.3 past end of life, schedule upgrade</li>
+      <li>PRUSA1 — heat block cleaning recommended at next scheduled maintenance</li>
+      <li>Both printers — store credentials in approved organizational password vault</li>
+    </ul>
+  </div>
+
+  <footer>
+    3D Printer System Inventory  |  PRUSA1 &amp; PRUSA2  |  Revision 1.3  |  Controlled Document
+    <br /><br />Made with IBM Bob
+  </footer>
+
+</div>
+</body>
+</html>

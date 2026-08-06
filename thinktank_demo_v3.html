@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ThinkTank OS — Autonomous Operations Platform</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#020509;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#c8d8e8;overflow:hidden}
+
+/* ── Shell ── */
+#shell{display:grid;grid-template-rows:56px 1fr 32px;height:100vh}
+
+/* ── Top bar ── */
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:#030810;border-bottom:1px solid #0d1e35;gap:20px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-pulse{width:10px;height:10px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;animation:hb 2.2s ease-in-out infinite;flex-shrink:0}
+@keyframes hb{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.75)}}
+.brand h1{font-size:16px;font-weight:800;color:#fff;letter-spacing:.03em}
+.brand .sub{font-size:9px;color:#1d3050;text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+.hkpis{display:flex;gap:24px}
+.hkpi .v{font-size:18px;font-weight:800;line-height:1}
+.hkpi .l{font-size:9px;color:#1d3050;text-transform:uppercase;letter-spacing:.07em;margin-top:2px;text-align:right}
+.cg{color:#34d399}.cb{color:#60a5fa}.cp{color:#a78bfa}.ca{color:#fbbf24}.cr{color:#f87171}.cw{color:#e2e8f0}
+#scenario-label{font-size:10px;color:#2a4060;text-align:right;min-width:120px}
+#scenario-label strong{display:block;color:#3b82f6;font-size:12px;font-weight:700}
+
+/* ── Body ── */
+#body{display:grid;grid-template-columns:300px 1fr 300px;gap:1px;background:#071020;overflow:hidden}
+
+/* ── Panel ── */
+.panel{background:#030b18;display:flex;flex-direction:column;overflow:hidden}
+.ph{padding:9px 16px;background:#040f20;border-bottom:1px solid #071828;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.ph h2{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:#1d3a58}
+.badge{font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.b-ok{background:rgba(52,211,153,.1);color:#34d399;border:1px solid rgba(52,211,153,.2)}
+.b-blue{background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2)}
+.b-vics{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2)}
+.b-warn{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.2)}
+.b-surge{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2)}
+.pb{flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:0;overflow:hidden}
+
+/* ── Status bar ── */
+#sbar{display:flex;align-items:center;gap:20px;padding:0 28px;background:#030810;border-top:1px solid #071020;font-size:9px;color:#1a3050}
+.sbi{display:flex;align-items:center;gap:5px}
+.sbd{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+
+/* ═══════════════════════════════════════════
+   LEFT: AGENT INTELLIGENCE PANEL
+═══════════════════════════════════════════ */
+#agent .pb{padding:0;gap:0}
+.ag-block{padding:12px 16px;border-bottom:1px solid #071020}
+.ag-block:last-child{border-bottom:none}
+.ag-lbl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:#1d3050;margin-bottom:6px}
+.ag-val{font-size:13px;font-weight:700;line-height:1.35}
+.ag-obj{color:#34d399}
+.ag-strat{color:#60a5fa}
+
+/* confidence */
+.conf-row{display:flex;align-items:center;gap:8px}
+.conf-track{flex:1;height:5px;background:#071020;border-radius:3px;overflow:hidden}
+.conf-fill{height:100%;background:linear-gradient(90deg,#1d4ed8,#34d399);border-radius:3px;transition:width 1.4s ease}
+.conf-pct{font-size:14px;font-weight:800;color:#34d399;min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* behavior loop */
+.loop-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.ls{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:3px 7px;border-radius:3px;transition:all .5s}
+.ls-done  {background:rgba(96,165,250,.08);color:#2a4060;border:1px solid rgba(96,165,250,.1)}
+.ls-active{background:rgba(52,211,153,.16);color:#34d399;border:1px solid rgba(52,211,153,.3);box-shadow:0 0 8px rgba(52,211,153,.2)}
+.ls-idle  {background:rgba(255,255,255,.02);color:#1a2a3a;border:1px solid #071020}
+
+/* priority stack */
+.prio-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #071020}
+.prio-item:last-child{border-bottom:none}
+.prio-num{font-size:9px;font-weight:800;color:#1d3050;min-width:14px}
+.prio-bar-wrap{flex:1;height:4px;background:#071020;border-radius:2px;overflow:hidden}
+.prio-bar{height:100%;border-radius:2px;transition:width 1.4s ease}
+.pbar-1{background:linear-gradient(90deg,#059669,#34d399);width:98%}
+.pbar-2{background:linear-gradient(90deg,#1d4ed8,#60a5fa);width:82%}
+.pbar-3{background:linear-gradient(90deg,#6d28d9,#a78bfa);width:76%}
+.pbar-4{background:linear-gradient(90deg,#b45309,#fbbf24);width:64%}
+.pbar-5{background:linear-gradient(90deg,#0f766e,#2dd4bf);width:51%}
+.prio-label{font-size:10px;color:#3a5878;flex:1}
+.prio-status{font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px}
+.ps-active{color:#34d399;background:rgba(52,211,153,.1)}
+.ps-watch {color:#fbbf24;background:rgba(251,191,36,.1)}
+.ps-idle  {color:#2a4060;background:rgba(255,255,255,.04)}
+
+/* forecast */
+.fc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+.fc-cell{background:#071020;border-radius:5px;padding:7px 10px;border:1px solid #0d1e35}
+.fc-v{font-size:15px;font-weight:800;line-height:1}
+.fc-l{font-size:8px;color:#1d3050;text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+
+/* ═══════════════════════════════════════════
+   CENTER: NARRATIVE ENGINE
+═══════════════════════════════════════════ */
+#center{display:flex;flex-direction:column;overflow:hidden}
+
+/* scenario selector row */
+#scenario-bar{display:flex;align-items:center;gap:6px;padding:10px 16px;background:#040f20;border-bottom:1px solid #071828;flex-shrink:0;overflow-x:auto}
+.sc-pill{border:1px solid #0d1e35;border-radius:20px;background:transparent;color:#2a4060;font-family:inherit;font-size:10px;font-weight:600;padding:5px 14px;cursor:pointer;white-space:nowrap;transition:all .2s;letter-spacing:.03em}
+.sc-pill:hover{border-color:#2a4060;color:#c8d8e8}
+.sc-pill.active{border-color:var(--c);color:var(--c);background:rgba(255,255,255,.04);box-shadow:0 0 12px var(--c) inset}
+.sp-normal{--c:#34d399}.sp-surge{--c:#f87171}.sp-load{--c:#fbbf24}.sp-grid{--c:#60a5fa}.sp-cont{--c:#a78bfa}.sp-recovery{--c:#2dd4bf}
+
+/* system voice — the main narrator */
+#voice-box{padding:20px 22px;flex-shrink:0;border-bottom:1px solid #071020}
+.voice-meta{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:#1d3050;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.voice-dot{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;animation:hb 1.4s infinite}
+#voice-text{font-size:15px;font-weight:400;color:#c8d8e8;line-height:1.7;min-height:52px;transition:opacity .4s}
+#voice-text strong{color:#fff;font-weight:700}
+#voice-text em{color:#60a5fa;font-style:normal;font-weight:600}
+#voice-sub{font-size:11px;color:#2a4060;margin-top:8px;line-height:1.6;min-height:20px;transition:opacity .4s}
+
+/* story timeline */
+#timeline{padding:12px 22px;border-bottom:1px solid #071020;flex-shrink:0}
+.tl-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:#1d3050;margin-bottom:10px}
+.tl-steps{display:flex;align-items:center;gap:0}
+.tl-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+.tl-step::after{content:'';position:absolute;top:11px;left:50%;width:100%;height:1px;background:#071020;z-index:0}
+.tl-step:last-child::after{display:none}
+.tl-dot{width:22px;height:22px;border-radius:50%;border:2px solid #0d1e35;background:#030b18;display:flex;align-items:center;justify-content:center;z-index:1;font-size:8px;font-weight:800;transition:all .5s;flex-shrink:0}
+.tl-name{font-size:8px;color:#1d3050;margin-top:5px;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.05em;transition:color .5s;white-space:nowrap}
+.tl-step.done .tl-dot{border-color:#3b82f6;background:#071828;color:#60a5fa}
+.tl-step.done .tl-name{color:#3a5878}
+.tl-step.active .tl-dot{border-color:#34d399;background:rgba(52,211,153,.15);color:#34d399;box-shadow:0 0 10px rgba(52,211,153,.4)}
+.tl-step.active .tl-name{color:#34d399}
+.tl-step.idle .tl-dot{color:#1a2a3a}
+
+/* event feed */
+#event-feed{flex:1;overflow-y:auto;padding:0}
+.ev{padding:14px 22px;border-bottom:1px solid #071020;display:grid;grid-template-columns:auto 1fr;gap:0 14px;cursor:default;transition:background .2s}
+.ev:hover{background:rgba(255,255,255,.015)}
+.ev-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.ev-right{display:flex;flex-direction:column;gap:3px}
+.ev-title{font-size:11px;font-weight:700;color:#8ab0cc}
+.ev-reason{font-size:10px;color:#2a4060;line-height:1.5}
+.ev-reason strong{color:#3a5878}
+.ev-action{font-size:10px;color:#1d3a5a;line-height:1.5}
+.ev-action strong{color:#3b82f6}
+.ev-outcome{font-size:10px;color:#1d3a5a;line-height:1.5}
+.ev-outcome strong{color:#34d399}
+.ev-ts{font-size:8px;color:#1a2a3a;margin-top:2px;font-variant-numeric:tabular-nums}
+
+.icon-agent  {background:rgba(52,211,153,.1);color:#34d399;border:1px solid rgba(52,211,153,.15)}
+.icon-vics   {background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.15)}
+.icon-bank   {background:rgba(96,165,250,.1); color:#60a5fa;border:1px solid rgba(96,165,250,.15)}
+.icon-surge  {background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.15)}
+.icon-twin   {background:rgba(45,212,191,.1); color:#2dd4bf;border:1px solid rgba(45,212,191,.15)}
+
+/* run scenario button */
+#run-btn{margin:12px 22px 12px;padding:13px 0;background:linear-gradient(135deg,#1d4ed8,#7c3aed);border:none;color:#fff;font-family:inherit;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:.06em;transition:opacity .2s,box-shadow .2s;box-shadow:0 0 30px rgba(99,102,241,.3);flex-shrink:0}
+#run-btn:hover{box-shadow:0 0 50px rgba(99,102,241,.55)}
+#run-btn:disabled{opacity:.4;cursor:default}
+
+/* ═══════════════════════════════════════════
+   RIGHT: VICS DOCTRINE + LIVE STATE
+═══════════════════════════════════════════ */
+#right{display:flex;flex-direction:column;overflow:hidden}
+
+/* VICS doctrine */
+#vics-panel .pb{padding:0;gap:0}
+.doctrine-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:#1d3050;padding:10px 16px 6px;border-bottom:1px solid #071020}
+.doctrine-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #071020}
+.dr-badge{font-size:9px;padding:3px 9px;border-radius:4px;background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);font-weight:700;min-width:50px;text-align:center;flex-shrink:0}
+.dr-arrow{color:#1d3050;font-size:16px;flex-shrink:0}
+.dr-text{font-size:10px;color:#3a5878;flex:1}
+.dr-protected{color:#34d399;background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.2)}
+.doctrine-status{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #071020}
+.ds-label{font-size:10px;color:#2a4060}
+.ds-val{font-size:11px;font-weight:800;color:#34d399;letter-spacing:.06em}
+
+/* health bars */
+.vics-health{padding:10px 16px;border-bottom:1px solid #071020}
+.vh-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.vh-row:last-child{margin-bottom:0}
+.vh-name{font-size:10px;font-weight:800;color:#a78bfa;min-width:18px}
+.vh-desc{font-size:9px;color:#1d3050;min-width:80px}
+.vh-track{flex:1;height:7px;background:#071020;border-radius:4px;overflow:hidden}
+.vh-fill{height:100%;border-radius:4px;transition:width 1.4s ease}
+.vha{background:linear-gradient(90deg,#4338ca,#818cf8)}
+.vhb{background:linear-gradient(90deg,#6d28d9,#a78bfa)}
+.vhc{background:linear-gradient(90deg,#7e22ce,#c084fc)}
+.vh-pct{font-size:10px;font-weight:700;color:#a78bfa;min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* live gauges */
+.live-gauge{padding:8px 16px;border-bottom:1px solid #071020}
+.lg-row{display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-bottom:4px}
+.lg-row span:first-child{color:#1d3050}
+.lg-row span:last-child{font-weight:700;font-variant-numeric:tabular-nums}
+.lg-track{height:4px;background:#071020;border-radius:2px;overflow:hidden}
+.lg-fill{height:100%;border-radius:2px;transition:width 1.4s ease}
+.lfg{background:linear-gradient(90deg,#059669,#34d399)}
+.lfb{background:linear-gradient(90deg,#1d4ed8,#60a5fa)}
+
+/* stat rows */
+.sr{display:flex;justify-content:space-between;align-items:baseline;padding:5px 16px;border-bottom:1px solid #071020;font-size:10px}
+.sr:last-child{border-bottom:none}
+.sr-k{color:#1d3050}
+.sr-v{font-weight:700;font-variant-numeric:tabular-nums}
+
+/* future forecast */
+#forecast-panel .pb{padding:0;gap:0}
+.fc-row{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid #071020}
+.fc-row:last-child{border-bottom:none}
+.fc-k{font-size:10px;color:#1d3050}
+.fc-v{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.fc-bar-row{padding:6px 16px 10px;border-bottom:1px solid #071020}
+.fc-mini-lbl{font-size:8px;color:#1d3050;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.fc-mini-track{height:4px;background:#071020;border-radius:2px;overflow:hidden}
+.fc-mini-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#059669,#34d399);transition:width 1.4s ease}
+</style>
+</head>
+<body>
+<div id="shell">
+
+<!-- ══ TOP BAR ══ -->
+<div id="topbar">
+  <div class="brand">
+    <div class="brand-pulse"></div>
+    <div>
+      <h1>ThinkTank OS</h1>
+      <div class="sub">Autonomous Operations Platform &nbsp;·&nbsp; v7 VICS</div>
+    </div>
+  </div>
+  <div class="hkpis">
+    <div class="hkpi"><div class="v cg" id="h-soh">100%</div><div class="l">Asset SOH</div></div>
+    <div class="hkpi"><div class="v cb" id="h-batt">83J</div><div class="l">Critical Asset</div></div>
+    <div class="hkpi"><div class="v ca" id="h-bank">187J</div><div class="l">Bank</div></div>
+    <div class="hkpi"><div class="v cp" id="h-vics">55J</div><div class="l">VICS Total</div></div>
+    <div class="hkpi"><div class="v cg" id="h-eff">181%</div><div class="l">Efficiency</div></div>
+  </div>
+  <div id="scenario-label">
+    <span>Active Scenario</span>
+    <strong id="sc-name-hdr">Normal Operation</strong>
+  </div>
+</div>
+
+<!-- ══ BODY ══ -->
+<div id="body">
+
+  <!-- ── LEFT: Agent Intelligence ── -->
+  <div class="panel" id="agent">
+    <div class="ph"><h2>ThinkTank Agent</h2><span class="badge b-ok" id="agent-badge">REASONING</span></div>
+    <div class="pb">
+
+      <div class="ag-block">
+        <div class="ag-lbl">Current Objective</div>
+        <div class="ag-val ag-obj" id="ag-obj">Maintain Critical Asset Floor</div>
+      </div>
+
+      <div class="ag-block">
+        <div class="ag-lbl">Current Strategy</div>
+        <div class="ag-val ag-strat" id="ag-strat">Cascade Pull A &#8594; B &#8594; C</div>
+      </div>
+
+      <div class="ag-block">
+        <div class="ag-lbl">Confidence</div>
+        <div class="conf-row" style="margin-top:2px">
+          <div class="conf-track"><div class="conf-fill" id="conf-fill" style="width:96%"></div></div>
+          <div class="conf-pct" id="conf-pct">96%</div>
+        </div>
+        <div class="loop-row" style="margin-top:8px">
+          <span class="ls ls-done"  id="ls-obs">Observe</span>
+          <span class="ls ls-done"  id="ls-und">Understand</span>
+          <span class="ls ls-active" id="ls-pred">Predict</span>
+          <span class="ls ls-idle"  id="ls-act">Act</span>
+          <span class="ls ls-idle"  id="ls-exp">Explain</span>
+        </div>
+      </div>
+
+      <div class="ag-block">
+        <div class="ag-lbl">Priority Stack</div>
+        <div class="prio-item">
+          <span class="prio-num">1</span>
+          <div class="prio-bar-wrap"><div class="prio-bar pbar-1"></div></div>
+          <span class="prio-label" id="p1-lbl">Protect Asset Floor</span>
+          <span class="prio-status ps-active" id="p1-s">ACTIVE</span>
+        </div>
+        <div class="prio-item">
+          <span class="prio-num">2</span>
+          <div class="prio-bar-wrap"><div class="prio-bar pbar-2"></div></div>
+          <span class="prio-label" id="p2-lbl">Restore Chamber C</span>
+          <span class="prio-status ps-watch" id="p2-s">WATCH</span>
+        </div>
+        <div class="prio-item">
+          <span class="prio-num">3</span>
+          <div class="prio-bar-wrap"><div class="prio-bar pbar-3"></div></div>
+          <span class="prio-label" id="p3-lbl">Maintain Device Uptime</span>
+          <span class="prio-status ps-active" id="p3-s">ACTIVE</span>
+        </div>
+        <div class="prio-item">
+          <span class="prio-num">4</span>
+          <div class="prio-bar-wrap"><div class="prio-bar pbar-4"></div></div>
+          <span class="prio-label" id="p4-lbl">Increase Reserve Margin</span>
+          <span class="prio-status ps-idle" id="p4-s">IDLE</span>
+        </div>
+        <div class="prio-item">
+          <span class="prio-num">5</span>
+          <div class="prio-bar-wrap"><div class="prio-bar pbar-5"></div></div>
+          <span class="prio-label" id="p5-lbl">Optimize Recovery Loop</span>
+          <span class="prio-status ps-idle" id="p5-s">IDLE</span>
+        </div>
+      </div>
+
+      <div class="ag-block" style="flex:1">
+        <div class="ag-lbl">30-Tick Forecast</div>
+        <div class="fc-grid">
+          <div class="fc-cell"><div class="fc-v cg" id="fc-soh">100%</div><div class="fc-l">Asset SOH</div></div>
+          <div class="fc-cell"><div class="fc-v cg" id="fc-risk">LOW</div><div class="fc-l">Risk Level</div></div>
+          <div class="fc-cell"><div class="fc-v cp" id="fc-vics">+14%</div><div class="fc-l">VICS Reserve</div></div>
+          <div class="fc-cell"><div class="fc-v cb" id="fc-up">100</div><div class="fc-l">Uptime (ticks)</div></div>
+        </div>
+        <div style="margin-top:8px;padding:7px 10px;background:#071020;border-radius:5px;border:1px solid #0d1e35">
+          <div style="font-size:8px;color:#1d3050;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Forecast Confidence</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:4px;background:#030b18;border-radius:2px;overflow:hidden"><div style="height:100%;width:94%;background:linear-gradient(90deg,#1d4ed8,#34d399);border-radius:2px"></div></div>
+            <span style="font-size:11px;font-weight:700;color:#34d399">94%</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── CENTER: Narrative Engine ── -->
+  <div class="panel" id="center">
+
+    <!-- Scenario selector -->
+    <div id="scenario-bar">
+      <span style="font-size:9px;color:#1d3050;text-transform:uppercase;letter-spacing:.1em;flex-shrink:0;margin-right:4px">Scenario:</span>
+      <button class="sc-pill sp-normal active" data-sc="normal">Normal Operation</button>
+      <button class="sc-pill sp-surge"         data-sc="surge">Power Surge</button>
+      <button class="sc-pill sp-load"          data-sc="load">Load Spike</button>
+      <button class="sc-pill sp-grid"          data-sc="grid">Grid Disruption</button>
+      <button class="sc-pill sp-cont"          data-sc="cont">Contaminant Mode</button>
+      <button class="sc-pill sp-recovery"      data-sc="recovery">Autonomous Recovery</button>
+    </div>
+
+    <!-- System voice / narrator -->
+    <div id="voice-box">
+      <div class="voice-meta">
+        <div class="voice-dot"></div>
+        ThinkTank OS — Live Narration
+      </div>
+      <div id="voice-text">The system is operating <strong>nominally</strong>. VICS chambers are pre-charged and holding. The Critical Energy Asset sits at <em>83J</em>, well above the floor threshold.</div>
+      <div id="voice-sub">No corrective action required. Next predicted event: overflow absorption in ~4 ticks.</div>
+    </div>
+
+    <!-- Story timeline -->
+    <div id="timeline">
+      <div class="tl-label">Scenario Arc</div>
+      <div class="tl-steps" id="tl-steps">
+        <div class="tl-step active" data-name="Detect"><div class="tl-dot">&#9679;</div><div class="tl-name">Detect</div></div>
+        <div class="tl-step idle"   data-name="Analyze"><div class="tl-dot">&#9679;</div><div class="tl-name">Analyze</div></div>
+        <div class="tl-step idle"   data-name="Decide"><div class="tl-dot">&#9679;</div><div class="tl-name">Decide</div></div>
+        <div class="tl-step idle"   data-name="Execute"><div class="tl-dot">&#9679;</div><div class="tl-name">Execute</div></div>
+        <div class="tl-step idle"   data-name="Verify"><div class="tl-dot">&#9679;</div><div class="tl-name">Verify</div></div>
+        <div class="tl-step idle"   data-name="Explain"><div class="tl-dot">&#9679;</div><div class="tl-name">Explain</div></div>
+      </div>
+    </div>
+
+    <!-- Event feed -->
+    <div id="event-feed" style="flex:1;overflow-y:auto"></div>
+
+    <!-- Run button -->
+    <button id="run-btn">&#9654;&nbsp;&nbsp; RUN SCENARIO</button>
+
+  </div>
+
+  <!-- ── RIGHT: VICS + State ── -->
+  <div id="right">
+
+    <!-- VICS Doctrine -->
+    <div class="panel" id="vics-panel" style="flex:0 0 auto">
+      <div class="ph"><h2>VICS Resilience Doctrine</h2><span class="badge b-vics">3 CHAMBERS</span></div>
+      <div class="pb" style="padding:0">
+        <div class="doctrine-title">Protection Cascade</div>
+        <div class="doctrine-row">
+          <span class="dr-badge">VICS A</span>
+          <span class="dr-arrow">&#8594;</span>
+          <span class="dr-text">guards and feeds</span>
+          <span class="dr-badge">VICS B</span>
+        </div>
+        <div class="doctrine-row">
+          <span class="dr-badge">VICS B</span>
+          <span class="dr-arrow">&#8594;</span>
+          <span class="dr-text">guards and feeds</span>
+          <span class="dr-badge">VICS C</span>
+        </div>
+        <div class="doctrine-row">
+          <span class="dr-badge">VICS C</span>
+          <span class="dr-arrow">&#8594;</span>
+          <span class="dr-text">guards and feeds</span>
+          <span class="dr-badge dr-protected">Critical Asset</span>
+        </div>
+        <div class="doctrine-status">
+          <span class="ds-label">Protection Status</span>
+          <span class="ds-val" id="vics-status">ACTIVE</span>
+        </div>
+        <div class="vics-health">
+          <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:#1d3050;margin-bottom:8px">Chamber Health</div>
+          <div class="vh-row"><span class="vh-name">A</span><span class="vh-desc">Intake x1.20</span><div class="vh-track"><div class="vh-fill vha" id="vha" style="width:25%"></div></div><span class="vh-pct" id="vha-p">25%</span></div>
+          <div class="vh-row"><span class="vh-name">B</span><span class="vh-desc">Resonance x1.15</span><div class="vh-track"><div class="vh-fill vhb" id="vhb" style="width:13%"></div></div><span class="vh-pct" id="vhb-p">13%</span></div>
+          <div class="vh-row"><span class="vh-name">C</span><span class="vh-desc">Output Guard</span><div class="vh-track"><div class="vh-fill vhc" id="vhc" style="width:0%"></div></div><span class="vh-pct" id="vhc-p">0%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live State -->
+    <div class="panel" style="flex:1;overflow:hidden">
+      <div class="ph"><h2>Critical Energy Asset</h2><span class="badge b-ok" id="cea-badge">SOH 100%</span></div>
+      <div class="pb" style="padding:0;gap:0">
+        <div class="live-gauge">
+          <div class="lg-row"><span>Charge Level</span><span class="cg" id="batt-lbl">83J / 250J</span></div>
+          <div class="lg-track"><div class="lg-fill lfg" id="batt-bar" style="width:33%"></div></div>
+        </div>
+        <div class="live-gauge">
+          <div class="lg-row"><span>State of Health</span><span class="cg" id="soh-lbl">100.0%</span></div>
+          <div class="lg-track"><div class="lg-fill lfg" id="soh-bar" style="width:100%"></div></div>
+        </div>
+        <div class="live-gauge">
+          <div class="lg-row"><span>Energy Bank</span><span class="cb" id="bank-lbl">187J / 500J</span></div>
+          <div class="lg-track"><div class="lg-fill lfb" id="bank-bar" style="width:37%"></div></div>
+        </div>
+        <div class="sr"><span class="sr-k">Deep Discharge Events</span><span class="sr-v cg">0</span></div>
+        <div class="sr"><span class="sr-k">SOH Degradation</span><span class="sr-v cg">0.000%</span></div>
+        <div class="sr"><span class="sr-k">D2 Uptime</span><span class="sr-v cg">100 / 100 ticks</span></div>
+        <div class="sr"><span class="sr-k">D3 Uptime</span><span class="sr-v cg">99 / 100 ticks</span></div>
+        <div class="sr"><span class="sr-k">Total Energy Recovered</span><span class="sr-v cb">591J</span></div>
+        <div class="sr"><span class="sr-k">System Efficiency</span><span class="sr-v cg">181%</span></div>
+        <div class="sr"><span class="sr-k">Ticks Run</span><span class="sr-v" id="tick-lbl">100 / 100</span></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ══ STATUS BAR ══ -->
+<div id="sbar">
+  <div class="sbi"><div class="sbd" style="background:#34d399"></div>Agent: reasoning</div>
+  <div class="sbi"><div class="sbd" style="background:#a78bfa"></div>VICS: cascade active</div>
+  <div class="sbi"><div class="sbd" style="background:#3b82f6"></div>Digital Twin: observing</div>
+  <div class="sbi"><div class="sbd" style="background:#2dd4bf"></div>Resilience Engine: armed</div>
+  <div style="margin-left:auto;font-size:9px;font-variant-numeric:tabular-nums;color:#1a3050" id="sbar-tick">Tick 100 / 100 &nbsp;·&nbsp; 0 anomalies &nbsp;·&nbsp; SOH 100%</div>
+</div>
+
+</div><!-- /shell -->
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// SCENARIO DEFINITIONS
+// Each scenario tells a story: voice narration, timeline arc,
+// event entries (reason / action / outcome), agent state changes
+// ═══════════════════════════════════════════════════════════
+const SCENARIOS = {
+
+  normal: {
+    name: 'Normal Operation',
+    agentBadge: 'REASONING', agentBadgeClass: 'b-ok',
+    obj: 'Maintain Critical Asset Floor',
+    strat: 'Cascade Pull A \u2192 B \u2192 C',
+    conf: 96,
+    loop: 2,
+    priorities: [
+      {l:'Protect Asset Floor',     s:'ACTIVE', sc:'ps-active'},
+      {l:'Restore Chamber C',       s:'WATCH',  sc:'ps-watch'},
+      {l:'Maintain Device Uptime',  s:'ACTIVE', sc:'ps-active'},
+      {l:'Increase Reserve Margin', s:'IDLE',   sc:'ps-idle'},
+      {l:'Optimize Recovery Loop',  s:'IDLE',   sc:'ps-idle'},
+    ],
+    fc:{soh:'100%',risk:'LOW',vics:'+14%',up:'100'},
+    vicsStatus: 'ACTIVE',
+    voice: 'The system is operating <strong>nominally</strong>. VICS chambers are pre-charged and holding. The Critical Energy Asset sits at <em>83J</em>, well above the floor threshold.',
+    voiceSub: 'No corrective action required. Next predicted event: overflow absorption in ~4 ticks.',
+    tlSteps: ['Detect','Monitor','Hold','Sustain','Verify','Report'],
+    tlActive: 0,
+    events: [
+      {icon:'&#9775;', icls:'icon-agent', title:'Nominal State Confirmed',
+       reason:'All subsystems reporting within expected parameters. VICS A/B/C pre-charged.',
+       action:'<strong>Action:</strong> Hold current configuration. VICS C releasing 14J/tick to Critical Asset.',
+       outcome:'<strong>Outcome:</strong> Critical Asset SOH holding at 100%. Both devices sustaining full uptime.',
+       ts:'Tick 100'},
+      {icon:'&#9636;', icls:'icon-bank', title:'Energy Bank — Stable Hold',
+       reason:'Bank at 187J. Overflow threshold (300J) not reached. SC1 in trickle mode.',
+       action:'<strong>Action:</strong> Trickle charge active at 3J/tick. No overflow routing required.',
+       outcome:'<strong>Outcome:</strong> Bank conserving capacity for next surge event.',
+       ts:'Tick 99'},
+      {icon:'&#9672;', icls:'icon-vics', title:'VICS Chamber B — Reservoir Healthy',
+       reason:'Chamber B at 25J. Above emergency refill floor (25J). No cascade pull needed.',
+       action:'<strong>Action:</strong> Monitoring B level. Chamber C pulling from B only if C drops below 20J.',
+       outcome:'<strong>Outcome:</strong> Cascade chain intact. Battery isolation guaranteed.',
+       ts:'Tick 97'},
+    ],
+  },
+
+  surge: {
+    name: 'Power Surge',
+    agentBadge: 'RESPONDING', agentBadgeClass: 'b-surge',
+    obj: 'Contain Surge — Protect Critical Asset',
+    strat: 'Route Overflow via VICS A \u2192 B Cascade',
+    conf: 91,
+    loop: 3,
+    priorities: [
+      {l:'Contain Surge Energy',    s:'ACTIVE', sc:'ps-active'},
+      {l:'Protect Asset Floor',     s:'ACTIVE', sc:'ps-active'},
+      {l:'Absorb Overflow to VICS', s:'ACTIVE', sc:'ps-active'},
+      {l:'Maintain Device Uptime',  s:'WATCH',  sc:'ps-watch'},
+      {l:'Restore Normal State',    s:'IDLE',   sc:'ps-idle'},
+    ],
+    fc:{soh:'100%',risk:'LOW',vics:'+22%',up:'100'},
+    vicsStatus: 'SURGE ABSORB',
+    voice: 'A <strong>+68V surge</strong> has been detected on the MUT. SC1 boost converter is now active at <em>x1.45 amplification</em>. The overflow is being routed into VICS Chamber A for absorption.',
+    voiceSub: 'Critical Asset is isolated from the spike by the VICS cascade. No SOH risk detected.',
+    tlSteps: ['Detect','Analyze','Decide','Execute','Verify','Explain'],
+    tlActive: 3,
+    events: [
+      {icon:'&#9889;', icls:'icon-surge', title:'Surge Detected — +68V on MUT',
+       reason:'<strong>Reason:</strong> MUT voltage exceeded nominal by 68V. Raw energy input = 40.6J this tick vs normal 3J.',
+       action:'<strong>Action:</strong> SC1 boost converter engaged at x1.45. Overflow of 22J routed to VICS Chamber A.',
+       outcome:'<strong>Outcome:</strong> Critical Asset never saw the spike. VICS absorbed 22J. SOH unchanged.',
+       ts:'Tick 50'},
+      {icon:'&#9672;', icls:'icon-vics', title:'VICS Chamber A — Intake Active',
+       reason:'<strong>Reason:</strong> Chamber A received 22J overflow. Amplification at x1.20 — total A energy = 56.4J.',
+       action:'<strong>Action:</strong> A surplus pulsed to Chamber B. B now at 72.9J, above 60J resonance threshold.',
+       outcome:'<strong>Outcome:</strong> Surge energy redirected constructively. Chamber B refilled to full operating capacity.',
+       ts:'Tick 50'},
+      {icon:'&#9775;', icls:'icon-agent', title:'Agent Post-Surge Audit',
+       reason:'<strong>Reason:</strong> Surge event resolved. All chambers above floor thresholds. No device interruption.',
+       action:'<strong>Action:</strong> Reverting to normal hold strategy. SC1 returning to trickle mode.',
+       outcome:'<strong>Outcome:</strong> System absorbed a +68V spike with zero degradation. SOH: 100%.',
+       ts:'Tick 51'},
+    ],
+  },
+
+  load: {
+    name: 'Load Spike',
+    agentBadge: 'COMPENSATING', agentBadgeClass: 'b-warn',
+    obj: 'Compensate Device 3 Demand Spike',
+    strat: 'Emergency Pull C \u2190 B \u2190 A Cascade',
+    conf: 87,
+    loop: 3,
+    priorities: [
+      {l:'Protect Asset Floor',     s:'ACTIVE', sc:'ps-active'},
+      {l:'Feed Device 3 Demand',    s:'ACTIVE', sc:'ps-active'},
+      {l:'Refill Chamber C',        s:'ACTIVE', sc:'ps-active'},
+      {l:'Maintain Device Uptime',  s:'WATCH',  sc:'ps-watch'},
+      {l:'Restore Reserve Margin',  s:'IDLE',   sc:'ps-idle'},
+    ],
+    fc:{soh:'100%',risk:'MED',vics:'-8%',up:'100'},
+    vicsStatus: 'EMERGENCY',
+    voice: 'Device 3 is drawing <strong>40% above nominal</strong>. Chamber C reserves are being depleted faster than the regulated release rate. The agent has <em>triggered an emergency cascade pull</em> from Chamber B.',
+    voiceSub: 'Chamber C floor at risk. Agent escalating: B feeds C immediately. Battery floor protected.',
+    tlSteps: ['Detect','Analyze','Decide','Execute','Verify','Explain'],
+    tlActive: 3,
+    events: [
+      {icon:'&#9650;', icls:'icon-surge', title:'Device 3 Load Spike — +40% Demand',
+       reason:'<strong>Reason:</strong> Device 3 drawing 9.8W vs nominal 7W. Critical Asset drain accelerating above VICS replenishment rate.',
+       action:'<strong>Action:</strong> Agent triggered emergency pull: Chamber B releasing to C immediately. C floor threshold: 20J.',
+       outcome:'<strong>Outcome:</strong> Chamber C refilled to 28J. Critical Asset floor maintained. No deep discharge.',
+       ts:'Tick 42'},
+      {icon:'&#9672;', icls:'icon-vics', title:'VICS Emergency Cascade Executed',
+       reason:'<strong>Reason:</strong> Chamber C dropped to 18J — below 20J floor. B-to-C emergency pull protocol activated.',
+       action:'<strong>Action:</strong> B transferred 12J to C immediately. A simultaneously feeding B to prevent B from dropping below floor.',
+       outcome:'<strong>Outcome:</strong> Three-layer protection absorbed the demand spike. SOH unchanged at 100%.',
+       ts:'Tick 42'},
+      {icon:'&#9775;', icls:'icon-agent', title:'Cascade Recovery Complete',
+       reason:'<strong>Reason:</strong> Device 3 load normalising. All chambers recovering. SC3 return loop injecting energy back to bank.',
+       action:'<strong>Action:</strong> Returning to regulated 14J/tick output from Chamber C. Monitoring D3 for secondary spike.',
+       outcome:'<strong>Outcome:</strong> Load spike absorbed. Predicted risk returns to LOW within 3 ticks.',
+       ts:'Tick 44'},
+    ],
+  },
+
+  grid: {
+    name: 'Grid Disruption',
+    agentBadge: 'AUTONOMOUS', agentBadgeClass: 'b-blue',
+    obj: 'Sustain Devices — MUT Offline',
+    strat: 'Draw VICS Reservoir — Hold Device Uptime',
+    conf: 83,
+    loop: 3,
+    priorities: [
+      {l:'Maintain Device Uptime',  s:'ACTIVE', sc:'ps-active'},
+      {l:'Protect Asset Floor',     s:'ACTIVE', sc:'ps-active'},
+      {l:'Manage VICS Drawdown',    s:'ACTIVE', sc:'ps-active'},
+      {l:'Await Grid Restoration',  s:'WATCH',  sc:'ps-watch'},
+      {l:'Rebuild Reserves Post',   s:'IDLE',   sc:'ps-idle'},
+    ],
+    fc:{soh:'100%',risk:'MED',vics:'-34%',up:'98'},
+    vicsStatus: 'SUSTAINING',
+    voice: 'The MUT grid feed has <strong>been interrupted</strong>. No external energy input is available. ThinkTank OS is now operating <em>fully autonomously</em> — drawing from VICS reserves to sustain connected devices.',
+    voiceSub: 'VICS reservoir at 112J. Estimated autonomous operation: 8 ticks at current draw rate.',
+    tlSteps: ['Detect','Analyze','Decide','Execute','Verify','Explain'],
+    tlActive: 3,
+    events: [
+      {icon:'&#9889;', icls:'icon-surge', title:'Grid Feed Interrupted — MUT Offline',
+       reason:'<strong>Reason:</strong> MUT voltage dropped to zero. SC1 no longer receiving input. External energy source lost.',
+       action:'<strong>Action:</strong> Agent switched to autonomous sustain mode. VICS reservoir activated as primary energy source.',
+       outcome:'<strong>Outcome:</strong> Devices D2 and D3 remain powered. Critical Asset maintained above floor threshold.',
+       ts:'Tick 67'},
+      {icon:'&#9672;', icls:'icon-vics', title:'VICS Reservoir — Autonomous Sustain',
+       reason:'<strong>Reason:</strong> With no external input, Chamber B is now the primary supply. Drawdown rate: ~8J/tick net.',
+       action:'<strong>Action:</strong> Chamber C releasing 14J/tick to Critical Asset. B refilling C. A held in reserve for emergencies.',
+       outcome:'<strong>Outcome:</strong> System self-sustaining from stored energy. No disruption to device uptime.',
+       ts:'Tick 68'},
+      {icon:'&#9775;', icls:'icon-agent', title:'Autonomous Operation Confirmed',
+       reason:'<strong>Reason:</strong> 3 ticks of grid outage complete. SOH intact. VICS drawdown within predicted parameters.',
+       action:'<strong>Action:</strong> Monitoring VICS total. Will alert at 60J total (critical reserve floor).',
+       outcome:'<strong>Outcome:</strong> ThinkTank OS operating independently. This is the core resilience capability.',
+       ts:'Tick 70'},
+    ],
+  },
+
+  cont: {
+    name: 'Contaminant Mode',
+    agentBadge: 'FILTERING', agentBadgeClass: 'b-vics',
+    obj: 'Reclaim Energy from Contaminated Source',
+    strat: 'Isolate \u2192 Filter \u2192 Reclaim via VICS',
+    conf: 89,
+    loop: 3,
+    priorities: [
+      {l:'Isolate Contaminated Input',s:'ACTIVE', sc:'ps-active'},
+      {l:'Filter via VICS Intake',    s:'ACTIVE', sc:'ps-active'},
+      {l:'Protect Asset Floor',       s:'ACTIVE', sc:'ps-active'},
+      {l:'Reclaim Usable Energy',     s:'WATCH',  sc:'ps-watch'},
+      {l:'Validate Output Safety',    s:'IDLE',   sc:'ps-idle'},
+    ],
+    fc:{soh:'100%',risk:'LOW',vics:'+8%',up:'100'},
+    vicsStatus: 'FILTERING',
+    voice: 'A <strong>contaminated energy source</strong> has been detected on the MUT input. ThinkTank OS has activated isolation mode. VICS Chamber A is acting as a <em>first-stage filter and reclaimer</em>.',
+    voiceSub: 'Contaminated energy is being processed and cleaned. Estimated reclaim: +22J usable energy this cycle.',
+    tlSteps: ['Detect','Isolate','Filter','Reclaim','Validate','Explain'],
+    tlActive: 2,
+    events: [
+      {icon:'&#9762;', icls:'icon-vics', title:'Contaminated Source Detected',
+       reason:'<strong>Reason:</strong> MUT input signature matches contaminated energy profile. Direct routing to bank would compromise stored energy.',
+       action:'<strong>Action:</strong> Isolation stage engaged. Input redirected through VICS Chamber A filtration circuit.',
+       outcome:'<strong>Outcome:</strong> Contaminated energy isolated from main bank. Processing underway.',
+       ts:'Tick 15'},
+      {icon:'&#9672;', icls:'icon-vics', title:'VICS A — Filtration Stage Active',
+       reason:'<strong>Reason:</strong> Chamber A acting as intake buffer. Amplification adjusted to x1.10 to account for contamination overhead.',
+       action:'<strong>Action:</strong> 22J of contaminated energy being processed. Clean energy fraction: ~18J reclaimed to Chamber B.',
+       outcome:'<strong>Outcome:</strong> 18J of previously wasted energy reclaimed. System efficiency increased this cycle.',
+       ts:'Tick 15'},
+      {icon:'&#9775;', icls:'icon-agent', title:'Reclaim Cycle Complete',
+       reason:'<strong>Reason:</strong> Contamination filter cycle resolved. Clean energy delivered to Chamber B and cascaded to Critical Asset.',
+       action:'<strong>Action:</strong> Returning to standard VICS routing. Contamination log appended to audit trail.',
+       outcome:'<strong>Outcome:</strong> +18J reclaimed from contaminated source. Zero impact to SOH. Zero device interruption.',
+       ts:'Tick 16'},
+    ],
+  },
+
+  recovery: {
+    name: 'Autonomous Recovery',
+    agentBadge: 'RECOVERING', agentBadgeClass: 'b-ok',
+    obj: 'Full System Restore — All Reserves',
+    strat: 'Sequential Rebuild: A \u2192 B \u2192 C \u2192 Asset',
+    conf: 98,
+    loop: 3,
+    priorities: [
+      {l:'Rebuild Chamber A',       s:'ACTIVE', sc:'ps-active'},
+      {l:'Restore Chamber B',       s:'ACTIVE', sc:'ps-active'},
+      {l:'Refill Chamber C',        s:'ACTIVE', sc:'ps-active'},
+      {l:'Float Critical Asset',    s:'WATCH',  sc:'ps-watch'},
+      {l:'Confirm SOH Integrity',   s:'WATCH',  sc:'ps-watch'},
+    ],
+    fc:{soh:'100%',risk:'LOW',vics:'+100%',up:'100'},
+    vicsStatus: 'REBUILDING',
+    voice: 'Recovery sequence <strong>initiated</strong>. ThinkTank OS is executing a full system restore. VICS chambers are being rebuilt in sequence — <em>A first, then B, then C</em> — before returning to nominal float operation.',
+    voiceSub: 'Estimated full recovery: 12 ticks. Critical Asset SOH confirmed at 100%. Zero degradation events.',
+    tlSteps: ['Detect','Analyze','Decide','Execute','Verify','Explain'],
+    tlActive: 3,
+    events: [
+      {icon:'&#10003;', icls:'icon-agent', title:'Recovery Sequence Initiated',
+       reason:'<strong>Reason:</strong> Post-event audit complete. VICS reserves depleted below optimal. Full cascade rebuild ordered.',
+       action:'<strong>Action:</strong> SC1 trickle mode maximised. Overflow routing prioritised to Chamber A for immediate refill.',
+       outcome:'<strong>Outcome:</strong> Recovery sequence running. Predicted full reserve restoration in 12 ticks.',
+       ts:'Tick 71'},
+      {icon:'&#9672;', icls:'icon-vics', title:'VICS Cascade Rebuild — A to B',
+       reason:'<strong>Reason:</strong> Chamber A refilled to threshold (30J). Cascade pulse to B now active. B climbing toward 60J resonance floor.',
+       action:'<strong>Action:</strong> A pulsing surplus to B at x1.15 amplification. B at 42J — 18J from full operating threshold.',
+       outcome:'<strong>Outcome:</strong> Cascade rebuild progressing nominally. Chamber C refill will begin once B reaches 60J.',
+       ts:'Tick 74'},
+      {icon:'&#9984;', icls:'icon-twin', title:'Digital Twin — Recovery Confirmed',
+       reason:'<strong>Reason:</strong> All simulated parameters match recovery trajectory. No anomalies in observed vs predicted state.',
+       action:'<strong>Action:</strong> Digital Twin projecting full nominal operation in 6 ticks. SOH forecast: 100%.',
+       outcome:'<strong>Outcome:</strong> ThinkTank OS autonomous recovery complete. System resilience demonstrated end-to-end.',
+       ts:'Tick 76'},
+    ],
+  },
+
+};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const DATA = [
+  [1,59.3,173.5,30.0,60.0,26.8,100,0.0],
+  [10,89.4,204.7,30.0,66.1,28.4,100,12.3],
+  [25,136.8,245.0,30.0,70.4,30.1,100,0.0],
+  [30,148.2,255.3,30.0,72.9,31.2,100,18.6],
+  [50,140.8,243.7,30.0,65.8,26.3,100,22.1],
+  [65,150.0,263.8,30.0,70.0,29.8,100,27.5],
+  [85,141.7,243.3,30.0,60.8,22.1,100,14.2],
+  [100,83.3,187.2,30.0,25.0,0.0,100,0.0],
+];
+let simIdx = 0;
+
+let currentScenario = 'normal';
+let activePill = document.querySelector('.sc-pill.active');
+let running = false;
+
+// ═══════════════════════════════════════════════════════════
+// APPLY SCENARIO
+// ═══════════════════════════════════════════════════════════
+function applyScenario(key, animate) {
+  const sc = SCENARIOS[key];
+  if (!sc) return;
+  currentScenario = key;
+  document.getElementById('sc-name-hdr').textContent = sc.name;
+
+  // Agent
+  const badge = document.getElementById('agent-badge');
+  badge.textContent = sc.agentBadge;
+  badge.className = 'badge ' + sc.agentBadgeClass;
+  setFade('ag-obj', sc.obj);
+  setFade('ag-strat', sc.strat);
+  document.getElementById('conf-fill').style.width = sc.conf + '%';
+  document.getElementById('conf-pct').textContent  = sc.conf + '%';
+
+  // Behavior loop
+  const loopIds = ['ls-obs','ls-und','ls-pred','ls-act','ls-exp'];
+  loopIds.forEach((id,i) => {
+    const el = document.getElementById(id);
+    el.className = 'ls ' + (i < sc.loop ? 'ls-done' : i === sc.loop ? 'ls-active' : 'ls-idle');
+  });
+
+  // Priorities
+  sc.priorities.forEach((p,i) => {
+    const n = i+1;
+    document.getElementById('p'+n+'-lbl').textContent = p.l;
+    const sel = document.getElementById('p'+n+'-s');
+    sel.textContent = p.s;
+    sel.className = 'prio-status ' + p.sc;
+  });
+
+  // Forecast
+  document.getElementById('fc-soh').textContent  = sc.fc.soh;
+  document.getElementById('fc-risk').textContent = sc.fc.risk;
+  document.getElementById('fc-risk').className   = sc.fc.risk === 'LOW' ? 'fc-v cg' : 'fc-v ca';
+  document.getElementById('fc-vics').textContent = sc.fc.vics;
+  document.getElementById('fc-up').textContent   = sc.fc.up;
+
+  // VICS status
+  document.getElementById('vics-status').textContent = sc.vicsStatus;
+
+  // Voice narration
+  setFade('voice-text', sc.voice);
+  setFade('voice-sub',  sc.voiceSub);
+
+  // Timeline
+  const steps = document.querySelectorAll('#tl-steps .tl-step');
+  sc.tlSteps.forEach((name,i) => {
+    if (steps[i]) {
+      steps[i].querySelector('.tl-name').textContent = name;
+      steps[i].className = 'tl-step ' + (i < sc.tlActive ? 'done' : i === sc.tlActive ? 'active' : 'idle');
+    }
+  });
+
+  // Event feed — animate in if running
+  const feed = document.getElementById('event-feed');
+  if (animate) {
+    feed.innerHTML = '';
+    sc.events.forEach((ev, i) => {
+      setTimeout(() => addEvent(ev), i * 600);
+    });
+    // Advance timeline step by step
+    animateTimeline(sc.tlActive);
+  } else {
+    feed.innerHTML = '';
+    sc.events.forEach(ev => addEvent(ev));
+  }
+}
+
+function setFade(id, html) {
+  const el = document.getElementById(id);
+  el.style.opacity = '0';
+  setTimeout(() => { el.innerHTML = html; el.style.opacity = '1'; }, 220);
+}
+
+function addEvent(ev) {
+  const feed = document.getElementById('event-feed');
+  const div = document.createElement('div');
+  div.className = 'ev';
+  div.style.opacity = '0';
+  div.style.transform = 'translateY(8px)';
+  div.style.transition = 'opacity .4s, transform .4s';
+  div.innerHTML = `
+    <div class="ev-icon ${ev.icls}">${ev.icon}</div>
+    <div class="ev-right">
+      <div class="ev-title">${ev.title}</div>
+      <div class="ev-reason">${ev.reason}</div>
+      <div class="ev-action">${ev.action}</div>
+      <div class="ev-outcome">${ev.outcome}</div>
+      <div class="ev-ts">${ev.ts}</div>
+    </div>`;
+  feed.insertBefore(div, feed.firstChild);
+  requestAnimationFrame(() => {
+    div.style.opacity = '1';
+    div.style.transform = 'translateY(0)';
+  });
+  const all = feed.querySelectorAll('.ev');
+  if (all.length > 6) all[all.length-1].remove();
+}
+
+function animateTimeline(targetActive) {
+  const steps = document.querySelectorAll('#tl-steps .tl-step');
+  let cur = 0;
+  const iv = setInterval(() => {
+    steps.forEach((s,i) => {
+      s.className = 'tl-step ' + (i < cur ? 'done' : i === cur ? 'active' : 'idle');
+    });
+    cur++;
+    if (cur > targetActive) clearInterval(iv);
+  }, 500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCENARIO PILLS
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.sc-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (activePill) activePill.classList.remove('active');
+    btn.classList.add('active');
+    activePill = btn;
+    applyScenario(btn.dataset.sc, false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// RUN SCENARIO button — animates the full arc
+// ═══════════════════════════════════════════════════════════
+document.getElementById('run-btn').addEventListener('click', () => {
+  if (running) return;
+  running = true;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = '\u25FC  Running scenario...';
+
+  applyScenario(currentScenario, true);
+
+  // Re-enable after events finish animating
+  setTimeout(() => {
+    running = false;
+    btn.disabled = false;
+    btn.textContent = '\u9654  RUN SCENARIO';
+  }, SCENARIOS[currentScenario].events.length * 600 + 1200);
+});
+
+// ═══════════════════════════════════════════════════════════
+// LIVE GAUGES (cycle through sim data)
+// ═══════════════════════════════════════════════════════════
+function updateGauges() {
+  const r = DATA[simIdx % DATA.length];
+  const [tick,batt,bank,cha,chb,chc,soh,overflow] = r;
+  const vicsT = cha+chb+chc;
+
+  document.getElementById('h-soh').textContent  = soh+'%';
+  document.getElementById('h-batt').textContent = Math.round(batt)+'J';
+  document.getElementById('h-bank').textContent = Math.round(bank)+'J';
+  document.getElementById('h-vics').textContent = Math.round(vicsT)+'J';
+
+  document.getElementById('batt-lbl').textContent = Math.round(batt)+'J / 250J';
+  document.getElementById('batt-bar').style.width = (batt/250*100).toFixed(0)+'%';
+  document.getElementById('soh-lbl').textContent  = soh+'.0%';
+  document.getElementById('soh-bar').style.width  = soh+'%';
+  document.getElementById('bank-lbl').textContent = Math.round(bank)+'J / 500J';
+  document.getElementById('bank-bar').style.width = (bank/500*100).toFixed(0)+'%';
+  document.getElementById('tick-lbl').textContent = tick+' / 100';
+  document.getElementById('sbar-tick').textContent= 'Tick '+tick+' / 100  ·  0 anomalies  ·  SOH '+soh+'%';
+
+  const cha_p = (cha/120*100).toFixed(0);
+  const chb_p = (chb/200*100).toFixed(0);
+  const chc_p = (chc/80*100).toFixed(0);
+  document.getElementById('vha').style.width = cha_p+'%';
+  document.getElementById('vha-p').textContent = cha_p+'%';
+  document.getElementById('vhb').style.width = chb_p+'%';
+  document.getElementById('vhb-p').textContent = chb_p+'%';
+  document.getElementById('vhc').style.width = chc_p+'%';
+  document.getElementById('vhc-p').textContent = chc_p+'%';
+
+  const ceaBadge = document.getElementById('cea-badge');
+  ceaBadge.textContent = 'SOH '+soh+'%';
+
+  simIdx++;
+}
+
+// ═══════════════════════════════════════════════════════════
+// AGENT LOOP STEP
+// ═══════════════════════════════════════════════════════════
+const loopIds = ['ls-obs','ls-und','ls-pred','ls-act','ls-exp'];
+let loopStep = SCENARIOS[currentScenario].loop;
+function stepLoop() {
+  loopIds.forEach((id,i) => {
+    document.getElementById(id).className = 'ls ' +
+      (i < loopStep ? 'ls-done' : i === loopStep ? 'ls-active' : 'ls-idle');
+  });
+  loopStep = (loopStep+1) % loopIds.length;
+}
+
+// ═══════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════
+applyScenario('normal', false);
+updateGauges();
+setInterval(updateGauges, 2600);
+setInterval(stepLoop, 2800);
+</script>
+</body>
+</html>
