@@ -595,18 +595,22 @@ def run_room_app():
             is_idea   = p["post_type"] == "idea"
             is_gate   = p["post_type"] == "gate"
             is_vote   = p["post_type"] == "vote"
+            is_ask    = p["post_type"] == "ask"
             if is_dealer or is_gate:
                 bg, border = "#1e1433", "#7c5cd8"
             elif is_idea:
                 bg, border = "#0d2318", "#2da44e"
             elif is_vote:
                 bg, border = "#1a2030", "#3b82d4"
+            elif is_ask:
+                bg, border = "#1a2030", "#e3b341"
             else:
                 bg, border = "#1a1a1a", "#444444"
             icon = ("🤖" if is_dealer else
                     "🚦" if is_gate else
                     "💡" if is_idea else
-                    "🗳️" if is_vote else "💬")
+                    "🗳️" if is_vote else
+                    "❓" if is_ask else "💬")
             ts           = p["created_at"][11:16]
             safe_content = _html.escape(p["content"]).replace("\n", "<br>")
             safe_author  = _html.escape(p["author"])
@@ -639,45 +643,61 @@ def run_room_app():
         if room["status"] != "open":
             st.warning("This room is closed. No new posts allowed.")
         else:
-            post_type = st.radio("Post type", ["message", "idea", "question"], horizontal=True)
-            content = st.text_input("What do you want to put on the table?", key="post_content",
-                                    placeholder="Type and press Enter to post…")
-            do_post = st.button("Post", use_container_width=True)
+            post_type = st.radio(
+                "Post type",
+                ["message", "idea", "ask"],
+                horizontal=True,
+                help=(
+                    "message = chat with teammates, no AI  |  "
+                    "idea = propose something, AI comments  |  "
+                    "ask = question for the AI dealer"
+                ),
+            )
 
-            # Fire on Enter (new non-empty value different from last posted) OR button click
+            # Contextual placeholder per type
+            placeholder = {
+                "message": "Reply to the team… (no AI)",
+                "idea":    "Propose your idea… AI will comment",
+                "ask":     "Ask the dealer anything… AI will respond",
+            }[post_type]
+
+            content = st.text_input(
+                "What do you want to put on the table?",
+                key="post_content",
+                placeholder=placeholder,
+            )
+            do_post = st.button("Post  ↵", use_container_width=True, type="primary")
+
+            # Fire on Enter OR button click
             _last = st.session_state.get("_last_post", "")
-            _enter_post = content.strip() and content != _last
-            if _enter_post or do_post:
+            if (content.strip() and content != _last) or do_post:
                 if content.strip():
                     st.session_state["_last_post"] = content
                     add_post(room["id"], me, content, post_type=post_type)
+
+                    # ── AI response rules ──────────────────────────────────
                     if post_type == "idea":
                         idea_count = len(get_idea_posts(room["id"]))
-                        if idea_count >= 3:
-                            dealer_text = dealer_respond(
-                                room["id"],
-                                f"{idea_count} ideas on the table. Surface paths and ask team to converge.",
-                            )
-                            add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
+                        trigger = (
+                            f'New idea from {me}: "{content}". '
+                            f'There are now {idea_count} idea(s) on the table. '
+                            f'Comment briefly on this idea, then note any convergence '
+                            f'or divergence with other ideas already on the table.'
+                        )
+                        with st.spinner("Dealer is reviewing the idea…"):
+                            dealer_text = dealer_respond(room["id"], trigger)
+                        add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
+
+                    elif post_type == "ask":
+                        trigger = f'{me} asked: "{content}"'
+                        with st.spinner("Dealer is thinking…"):
+                            dealer_text = dealer_respond(room["id"], trigger)
+                        add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
+
+                    # message type — no AI, just posts to the board
                     st.rerun()
                 else:
                     st.warning("Nothing to post.")
-
-            st.divider()
-            st.subheader("Ask the Dealer")
-            dealer_q = st.text_input("Ask a question to the table dealer", key="dealer_q",
-                                     placeholder="Type and press Enter…")
-            _last_dq = st.session_state.get("_last_dealer_q", "")
-            _dealer_enter = dealer_q.strip() and dealer_q != _last_dq
-            if st.button("Ask Dealer", use_container_width=True) or _dealer_enter:
-                if dealer_q.strip():
-                    st.session_state["_last_dealer_q"] = dealer_q
-                    add_post(room["id"], me, dealer_q, post_type="question")
-                    dealer_reply = dealer_respond(room["id"], f'A participant asked: "{dealer_q}"')
-                    add_post(room["id"], DEALER_NAME, dealer_reply, post_type="dealer")
-                    st.rerun()
-                else:
-                    st.warning("Type a question first.")
 
             st.divider()
             ideas = get_idea_posts(room["id"])
