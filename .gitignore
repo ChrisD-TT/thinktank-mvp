@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -15,9 +15,11 @@ build/
 venv/
 env/
 ENV/
+Scripts/
 
 # Streamlit
 .streamlit/secrets.toml
+.streamlit/config.toml
 
 # Database (local data — do not commit)
 *.sqlite
@@ -34,9 +36,73 @@ Thumbs.db
 *.swp
 *.swo
 
-# Zip dumps
+# Zip dumps & extracted junk
 *.zip
+OneDrive_*/
+annotated_types*/
+anyio*/
+audio/
+audio(1)/
+auth/
+beta/
+certifi*/
+chat/
+chat(1)/
+chatkit/
+cli/
+colorama/
+colorama*/
+containers/
+conversations/
+helpers/
+jiter*/
+lib/
+ocean-atlas/
+Scripts/
+thinktank_extracted/
+thinktank_source/
+TTMVP/
+vector_stores/
+vnext/
+webhooks/
+webhooks(1)/
+_extras/
+_utils/
+pydantic*/
+resolvelib*/
+resources*/
+rich*/
+shared*/
+shared_params*/
+skills*/
+threads*/
+uploads*/
 
-# Streamlit local config (contains no secrets but avoids deploy warnings)
-.streamlit/config.toml
-
+# Old/legacy files
+thinktank2*.py
+thinktank2*.sqlite
+energy_bank_results.csv
+energy_bank_simulation.py
+hackathon_demo*.html
+thinktank_cinematic.html
+thinktank_demo_*.html
+thinktank-mvp-how-to-run.html
+tt_test.html
+voice_test.html
+mission_control.html
+three.min.js
+name.txt
+*.ps1
+*.bat
+!start.bat
+deploy_v2.ps1
+thinktank_bootstrap.ps1
+thinktank_os_build.ps1
+thinktank_os_deploy.ps1
+update_thinktank_v1.ps1
+BuildLinkedIn.ps1
+HOMEDesktopThinkTank*.ps1
+SPEECH.md
+PITCH.md
+THINKTANK OS.txt
+~$*
