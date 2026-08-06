@@ -337,6 +337,18 @@ def dealer_respond(room_id: int, trigger: str) -> str:
         )
 
 
+# ── Invite link helpers ───────────────────────────────────────────────────────
+def _make_invite_url(room_id: int) -> str:
+    """Return a shareable URL pre-filled with the room ID."""
+    try:
+        import streamlit as st
+        # st.query_params is a dict-like; build a URL from the current page
+        base = "http://localhost:8501"
+        return f"{base}/?room={room_id}"
+    except Exception:
+        return f"?room={room_id}"
+
+
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
 def run_room_app():
     try:
@@ -360,6 +372,22 @@ def run_room_app():
     ]:
         if key not in st.session_state:
             st.session_state[key] = default
+
+    # ── Auto-join from invite link (?room=<id>) ───────────────────────────────
+    # If the user arrives via a shareable link, pre-select the room in session
+    # state so the join panel opens directly on that room. We only do this once
+    # (when room_id is still None) to avoid overwriting an active session.
+    if st.session_state.room_id is None:
+        try:
+            qp = st.query_params
+            invited_room = qp.get("room", None)
+            if invited_room:
+                rid = int(invited_room)
+                room_check = get_room(rid)
+                if room_check and room_check["status"] == "open":
+                    st.session_state["_invite_room_id"] = rid
+        except Exception:
+            pass
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("## 🎲 ThinkTank Room")
@@ -443,17 +471,22 @@ def run_room_app():
                         rid = create_room(room_name, room_topic, room_password)
                         ok, msg = join_room(rid, host_name, room_password)
                         if ok:
-                            st.session_state.room_id = rid
-                            st.session_state.participant_name = host_name.strip()
-                            st.session_state.seated = True
-                            add_post(rid, DEALER_NAME,
-                                     f'Room opened: "{room_name}". Topic: {room_topic}',
-                                     post_type="dealer")
-                            st.success(
-                                f"✅ Room **{room_name}** created!\n\n"
-                                f"🔑 Share this password with your team: `{room_password}`"
-                            )
-                            st.rerun()
+                                st.session_state.room_id = rid
+                                st.session_state.participant_name = host_name.strip()
+                                st.session_state.seated = True
+                                add_post(rid, DEALER_NAME,
+                                         f'Room opened: "{room_name}". Topic: {room_topic}',
+                                         post_type="dealer")
+                                invite_url = _make_invite_url(rid)
+                                st.success(
+                                    f"✅ Room **{room_name}** created!"
+                                )
+                                st.markdown(
+                                    f"**🔑 Room password:** `{room_password}`  \n"
+                                    f"**🔗 Invite link:** `{invite_url}`  \n"
+                                    f"Share both with your team."
+                                )
+                                st.rerun()
                         else:
                             st.error(msg)
                 else:
@@ -468,7 +501,14 @@ def run_room_app():
             else:
                 labels    = [f"#{r['id']} — {r['name']}" for r in open_rooms]
                 id_map    = {f"#{r['id']} — {r['name']}": r["id"] for r in open_rooms}
-                sel       = st.selectbox("Select room", labels)
+                # Pre-select room from invite link if present
+                _invite_id = st.session_state.get("_invite_room_id")
+                _invite_idx = 0
+                if _invite_id:
+                    _invite_idx = next(
+                        (i for i, r in enumerate(open_rooms) if r["id"] == _invite_id), 0
+                    )
+                sel       = st.selectbox("Select room", labels, index=_invite_idx)
                 join_name = st.text_input("Your name", placeholder="Mentor",
                                           key="join_name_input")
                 join_pw   = st.text_input("Room password",
@@ -690,6 +730,10 @@ def run_room_app():
             if seats and seats[0]["participant_name"] == me:
                 st.divider()
                 st.subheader("Host controls")
+                invite_url = _make_invite_url(room["id"])
+                st.markdown(f"**🔗 Invite link:**")
+                st.code(invite_url, language=None)
+                st.caption("Share this link + the room password with your team.")
                 if room["status"] == "open":
                     if st.button("Close & Archive Room", use_container_width=True):
                         close_room(room["id"])
