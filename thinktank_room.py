@@ -600,6 +600,7 @@ def run_room_app():
                     use_container_width=True,
                 )
 
+        posts = visible
         if not posts:
             st.info("The table is empty. Post an idea to start.")
         else:
