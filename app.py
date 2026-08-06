@@ -24,9 +24,32 @@ from thinktank import config as cfg
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="ThinkTank", page_icon="🧠", layout="wide")
 
-# Hide the Streamlit deploy button
+# Hide deploy button + kill the running/dimming overlay Streamlit shows on every rerun
 st.markdown(
-    "<style>div.stAppDeployButton { display: none !important; }</style>",
+    """
+    <style>
+    /* Hide deploy button */
+    div.stAppDeployButton { display: none !important; }
+
+    /* Kill the semi-transparent overlay Streamlit dims the page with while running */
+    div[data-testid="stAppViewBlockContainer"] > div:first-child [data-testid="stStatusWidget"] { display: none !important; }
+    .stApp > header { display: none !important; }
+
+    /* This is the actual dimming overlay element */
+    div[class*="stAppRunningIndicator"],
+    div[class*="StatusWidget"],
+    [data-testid="stStatusWidget"],
+    div[class*="overlayRunning"],
+    iframe[title="streamlit_autorefresh"] { display: none !important; }
+
+    /* Hide the top running bar (the colored line that sweeps across) */
+    div[data-testid="stDecoration"] { display: none !important; }
+
+    /* Prevent the whole app dimming on rerun */
+    .stApp[class*="running"] { opacity: 1 !important; filter: none !important; }
+    .stApp[class*="running"] > * { opacity: 1 !important; filter: none !important; }
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
