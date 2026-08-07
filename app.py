@@ -687,10 +687,12 @@ with tab_coins:
             except Exception:
                 return os.environ.get(k, "")
 
-        _stripe_key = _sec("STRIPE_SECRET_KEY")
+        _stripe_key = _sec("STRIPE_SECRET_KEY").encode("ascii", errors="ignore").decode("ascii").strip()
 
         def _stripe_checkout(price_id, coins, session_id, api_key):
             """Call Stripe Checkout API directly — no SDK, no encoding issues."""
+            # Strip any non-ASCII characters that may have crept in via copy-paste
+            api_key = api_key.encode("ascii", errors="ignore").decode("ascii").strip()
             base = "https://web-production-69268.up.railway.app"
             params = _uparse.urlencode({
                 "mode": "payment",
@@ -700,7 +702,7 @@ with tab_coins:
                 "cancel_url": f"{base}?purchase=cancelled",
                 "metadata[session_id]": session_id,
                 "metadata[coins]": str(coins),
-            }).encode("ascii")
+            }).encode("utf-8")
             token = (__import__("base64").b64encode(f"{api_key}:".encode("ascii")).decode("ascii"))
             req = _ureq.Request(
                 "https://api.stripe.com/v1/checkout/sessions",
