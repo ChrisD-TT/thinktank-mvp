@@ -678,10 +678,12 @@ with tab_coins:
         st.caption("Coins power your ThinkTank AI sessions. Buy once, use anytime — coins never expire.")
 
         def _sec(k):
+            import os
             try:
-                return st.secrets.get(k, "") or ""
+                val = st.secrets.get(k, "") or ""
+                return val if val else os.environ.get(k, "")
             except Exception:
-                return ""
+                return os.environ.get(k, "")
 
         _stripe_key = _sec("STRIPE_SECRET_KEY")
 
