@@ -554,8 +554,7 @@ with tab_ask:
         if _ask_bal > 0:
             st.success(f"🪙 {_ask_bal} coins")
         else:
-            st.warning("🪙 0 coins")
-            st.caption("[Buy coins →](#buy-coins)")
+            st.warning("🪙 0 coins — go to 💳 Buy Coins tab")
 
     chats   = chat_list(limit=50)
     chat_id = st.session_state.current_chat_id
@@ -630,7 +629,7 @@ with tab_ask:
                 # Check + deduct coin before calling AI
                 _has_coin = _askdb.coin_spend(_ask_sid, 1)
                 if not _has_coin:
-                    st.error("🪙 No coins remaining. Go to **Buy Coins** tab to top up.")
+                    st.error("🪙 No coins remaining. Go to the **💳 Buy Coins** tab to top up.")
                 else:
                     with st.spinner("Thinking…"):
                         try:
@@ -639,13 +638,9 @@ with tab_ask:
                         except Exception as e:
                             # Refund coin if AI call failed
                             _askdb.coin_credit(_ask_sid, 1, f"refund-{_ask_sid}-{id(e)}")
-                            err = str(e)
-                            if "Cannot reach Ollama" in err or "ollama" in err.lower():
-                                st.error("🔌 Ollama is offline. Run `ollama serve` then try again.")
-                            else:
-                                st.error(err)
+                            st.error(f"AI error: {e}")
             else:
-                st.warning("Enter a message first.")
+                st.warning("Enter a message and select a chat first.")
     with a2:
         if st.button("📋 Save as User", use_container_width=True):
             if ask_text.strip() and chat_id:
@@ -723,10 +718,8 @@ with tab_coins:
         _coindb = importlib.reload(_coindb)
         _coindb.init_db()
         _bal = _coindb.coin_get_or_create(_sid)
-        st.metric("Your Coin Balance", f"{_bal} coins")
-        st.divider()
 
-        # ── Packages ──────────────────────────────────────────────────────────
+        # ── Packages (shown first so they're visible without scrolling) ───────
         _PKGS = [
             {"id": "starter",  "label": "Starter",  "coins": 40,  "price": "$3.99",  "price_id": _sec("STRIPE_PRICE_STARTER")},
             {"id": "standard", "label": "Standard", "coins": 125, "price": "$7.99",  "price_id": _sec("STRIPE_PRICE_STANDARD")},
@@ -756,6 +749,8 @@ with tab_coins:
                             except Exception as _e:
                                 st.error(f"Payment error: {_e}")
 
+        st.divider()
+        st.metric("Your Coin Balance", f"{_bal} coins")
         st.divider()
 
         # ── Handle return from Stripe ─────────────────────────────────────────
