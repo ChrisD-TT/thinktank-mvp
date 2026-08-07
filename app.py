@@ -725,10 +725,10 @@ with tab_coins:
                                     mode="payment",
                                     line_items=[{"price": _pkg["price_id"], "quantity": 1}],
                                     success_url=(
-                                        "http://localhost:8501?purchase=success"
+                                        "https://web-production-69268.up.railway.app?purchase=success"
                                         f"&coins={_pkg['coins']}&session={_sid}"
                                     ),
-                                    cancel_url="http://localhost:8501?purchase=cancelled",
+                                    cancel_url="https://web-production-69268.up.railway.app?purchase=cancelled",
                                     metadata={"session_id": _sid, "coins": str(_pkg["coins"]), "package": _pkg["id"]},
                                 )
                                 st.markdown(f"[👉 Click here to complete payment]({_co.url})")
