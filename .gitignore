@@ -1,3 +1,7 @@
+# Node.js
+ai-chat-backend/node_modules/
+ai-chat-backend/.env
+
 # Python
 __pycache__/
 *.py[cod]
