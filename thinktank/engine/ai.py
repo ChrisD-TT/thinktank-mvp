@@ -13,7 +13,7 @@ import urllib.request
 from thinktank.config import OLLAMA_BASE_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT
 
 
-GEMINI_MODEL   = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL   = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 
 

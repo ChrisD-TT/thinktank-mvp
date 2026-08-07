@@ -795,10 +795,12 @@ with tab_admin:
     from thinktank.engine.ai import is_available, chat as ai_chat
 
     def _get_secret(key):
+        import os
         try:
-            return st.secrets.get(key, "") or ""
+            val = st.secrets.get(key, "") or ""
+            return val if val else os.environ.get(key, "")
         except Exception:
-            return ""
+            return os.environ.get(key, "")
 
     # ── AI Backend Status ─────────────────────────────────────────────────────
     st.markdown("### 🤖 AI Backend Status")
