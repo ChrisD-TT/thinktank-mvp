@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ThinkTank AI Chat</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #030a16;
+    --surface:  #030f1c;
+    --panel:    #041626;
+    --border:   #102137;
+    --accent:   #34d399;
+    --blue:     #5991cc;
+    --text:     #dce7f4;
+    --muted:    #5f728d;
+    --danger:   #e05252;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 60px;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  header {
+    width: 100%;
+    background: #020810;
+    border-bottom: 1px solid var(--border);
+    padding: 0 25px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .logo h1 { font-size: 22px; font-weight: 900; }
+  .logo h1 span { color: var(--accent); }
+  .logo p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* ── Wallet ─────────────────────────────────────────── */
+  .wallet {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .coin-icon {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem;
+    color: #020810;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .coin-count {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .coin-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .buy-btn {
+    background: var(--accent);
+    color: #020810;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: opacity 0.15s;
+  }
+  .buy-btn:hover { opacity: 0.8; }
+
+  /* ── Main content ───────────────────────────────────── */
+  .content {
+    width: 100%;
+    max-width: 680px;
+    padding: 0 16px;
+  }
+
+  .panel-header {
+    background: var(--panel);
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── Chat box ───────────────────────────────────────── */
+  .chat-box {
+    border: 1px solid var(--border);
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .messages {
+    height: 400px;
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--surface);
+  }
+
+  /* scrollbar */
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .msg {
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.87rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg.user {
+    background: #071626;
+    border: 1px solid #1a3a5c;
+    align-self: flex-end;
+    color: #b8d4f0;
+  }
+  .msg.ai {
+    background: #071a12;
+    border: 1px solid #1a4a30;
+    color: #7ee8b0;
+    align-self: flex-start;
+  }
+  .msg.error {
+    background: #1e0f0f;
+    border: 1px solid #4a1e1e;
+    color: #e6a0a0;
+    align-self: center;
+    text-align: center;
+    font-size: 0.8rem;
+    max-width: 90%;
+  }
+  .msg.system {
+    color: var(--muted);
+    font-size: 0.77rem;
+    align-self: center;
+    font-style: italic;
+  }
+
+  .chat-input-row {
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: #020810;
+  }
+
+  textarea {
+    flex: 1;
+    background: transparent;
+    color: var(--text);
+    border: none;
+    padding: 14px 16px;
+    font-family: inherit;
+    font-size: 0.87rem;
+    resize: none;
+    outline: none;
+    min-height: 52px;
+    max-height: 120px;
+  }
+  textarea::placeholder { color: var(--muted); }
+
+  .send-btn {
+    background: var(--accent);
+    color: #020810;
+    border: none;
+    padding: 0 22px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover   { opacity: 0.8; }
+  .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .cost-note {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    padding: 7px;
+    background: #020810;
+    border-top: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Shop Modal ─────────────────────────────────────── */
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(2,8,16,0.88);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .modal h2 {
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .modal p {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-bottom: 22px;
+  }
+
+  .packages { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+  .pkg {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    background: var(--panel);
+  }
+  .pkg:hover, .pkg.selected { border-color: var(--accent); }
+
+  .pkg-name  { font-weight: 700; font-size: 0.9rem; }
+  .pkg-coins { color: var(--accent); font-size: 0.78rem; margin-top: 3px; }
+  .pkg-price { font-size: 1rem; font-weight: 800; color: var(--text); }
+
+  .checkout-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #020810;
+    border: none;
+    border-radius: 7px;
+    padding: 12px;
+    font-size: 0.9rem;
+    font-weight: 800;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: opacity 0.15s;
+  }
+  .checkout-btn:hover    { opacity: 0.8; }
+  .checkout-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .modal-close {
+    display: block;
+    text-align: center;
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  /* ── Toast ──────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #020810;
+    padding: 10px 22px;
+    border-radius: 7px;
+    font-weight: 800;
+    font-size: 0.82rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 99;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <h1>Think<span>Tank</span> AI</h1>
+    <p>Sensor Twin Engine • Public Access</p>
+  </div>
+  <div class="header-right">
+    <div class="wallet">
+      <div class="coin-icon">T</div>
+      <div>
+        <div class="coin-count" id="coinDisplay">—</div>
+        <div class="coin-label">coins</div>
+      </div>
+    </div>
+    <button class="buy-btn" onclick="grantTestCoins()" style="background:#1a3a5c;color:#7ec8f0;margin-right:8px;">+ Test Coins</button>
+    <button class="buy-btn" onclick="openShop()">Buy Coins</button>
+  </div>
+</header>
+
+<div class="content">
+  <div class="panel-header">ThinkTank Agent — AI Chat</div>
+  <div class="chat-box">
+    <div class="messages" id="messages">
+      <div class="msg system">Buy coins to activate the ThinkTank Agent.</div>
+    </div>
+    <div class="chat-input-row">
+      <textarea
+        id="input"
+        placeholder="Ask the ThinkTank Agent… (1 coin per message)"
+        rows="1"
+        onkeydown="handleKey(event)"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+    <div class="cost-note">1 coin per message &nbsp;·&nbsp; coins never expire &nbsp;·&nbsp; powered by Gemini &nbsp;·&nbsp; <span style="color:#34d399;cursor:pointer;text-transform:none" onclick="grantTestCoins()">get 50 free test coins</span></div>
+  </div>
+</div>
+
+<!-- Buy coins modal -->
+<div class="modal-backdrop" id="shopModal">
+  <div class="modal">
+    <h2>Buy Coins</h2>
+    <p>Coins power your ThinkTank Agent sessions. No subscription — buy once, use anytime.</p>
+    <div class="packages" id="packageList"></div>
+    <button class="checkout-btn" id="checkoutBtn" disabled onclick="checkout()">
+      Select a package
+    </button>
+    <span class="modal-close" onclick="closeShop()">Cancel</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Config ────────────────────────────────────────────
+  // Change this to your deployed backend URL before going live
+  const API = 'http://localhost:3001';
+
+  let selectedPackage = null;
+  let sending = false;
+
+  // ── Test coins (dev helper) ───────────────────────────
+  async function grantTestCoins() {
+    try {
+      const r = await fetch(`${API}/api/admin/grant`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 50 }),
+      });
+      const d = await r.json();
+      document.getElementById('coinDisplay').textContent = d.coins;
+      showToast('50 test coins added!');
+    } catch {
+      showToast('Could not reach server. Is it running?');
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────
+  async function init() {
+    await refreshBalance();
+    await loadPackages();
+
+    const params = new URLSearchParams(location.search);
+    if (params.get('purchase') === 'success') {
+      history.replaceState({}, '', location.pathname);
+      setTimeout(async () => {
+        await refreshBalance();
+        showToast('Coins added — Agent is ready.');
+      }, 2000);
+    }
+    if (params.get('purchase') === 'cancelled') {
+      history.replaceState({}, '', location.pathname);
+    }
+  }
+
+  async function refreshBalance() {
+    try {
+      const r = await fetch(`${API}/api/balance`, { credentials: 'include' });
+      const d = await r.json();
+      document.getElementById('coinDisplay').textContent = d.coins;
+    } catch {
+      document.getElementById('coinDisplay').textContent = '?';
+    }
+  }
+
+  // ── Shop ──────────────────────────────────────────────
+  async function loadPackages() {
+    try {
+      const r = await fetch(`${API}/api/packages`);
+      const pkgs = await r.json();
+      const list = document.getElementById('packageList');
+      list.innerHTML = '';
+      pkgs.forEach(pkg => {
+        const price = (pkg.price_usd / 100).toFixed(2);
+        const el = document.createElement('div');
+        el.className = 'pkg';
+        el.dataset.id = pkg.id;
+        el.innerHTML = `
+          <div>
+            <div class="pkg-name">${cap(pkg.id)}</div>
+            <div class="pkg-coins">${pkg.coins} coins</div>
+          </div>
+          <div class="pkg-price">$${price}</div>
+        `;
+        el.onclick = () => selectPkg(pkg.id);
+        list.appendChild(el);
+      });
+    } catch { /* backend not running yet */ }
+  }
+
+  function cap(s) { return s[0].toUpperCase() + s.slice(1); }
+  function openShop()  { document.getElementById('shopModal').classList.add('open'); }
+  function closeShop() { document.getElementById('shopModal').classList.remove('open'); }
+
+  function selectPkg(id) {
+    selectedPackage = id;
+    document.querySelectorAll('.pkg').forEach(el =>
+      el.classList.toggle('selected', el.dataset.id === id)
+    );
+    const btn = document.getElementById('checkoutBtn');
+    btn.disabled = false;
+    btn.textContent = `Buy ${cap(id)} →`;
+  }
+
+  async function checkout() {
+    if (!selectedPackage) return;
+    const btn = document.getElementById('checkoutBtn');
+    btn.disabled = true;
+    btn.textContent = 'Redirecting to Stripe…';
+    try {
+      const r = await fetch(`${API}/api/purchase`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId: selectedPackage }),
+      });
+      const d = await r.json();
+      if (d.url) {
+        window.location.href = d.url;
+      } else {
+        showToast('Error: ' + (d.error || 'unknown'));
+        btn.disabled = false;
+        btn.textContent = `Buy ${cap(selectedPackage)} →`;
+      }
+    } catch {
+      showToast('Network error. Try again.');
+      btn.disabled = false;
+    }
+  }
+
+  // ── Chat ──────────────────────────────────────────────
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  async function sendMessage() {
+    if (sending) return;
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const coins = parseInt(document.getElementById('coinDisplay').textContent, 10);
+    if (isNaN(coins) || coins < 1) { openShop(); return; }
+
+    sending = true;
+    document.getElementById('sendBtn').disabled = true;
+    input.value = '';
+    appendMsg('user', text);
+
+    try {
+      const r = await fetch(`${API}/api/chat`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      const d = await r.json();
+
+      if (r.status === 402) {
+        appendMsg('error', 'No coins remaining. Buy more to continue.');
+        openShop();
+      } else if (!r.ok) {
+        appendMsg('error', d.error || 'Something went wrong.');
+      } else {
+        appendMsg('ai', d.reply);
+        document.getElementById('coinDisplay').textContent = d.coins;
+      }
+    } catch {
+      appendMsg('error', 'Could not reach the ThinkTank server.');
+    }
+
+    sending = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+  }
+
+  function appendMsg(type, text) {
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `msg ${type}`;
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3200);
+  }
+
+  init();
+</script>
+</body>
+</html>

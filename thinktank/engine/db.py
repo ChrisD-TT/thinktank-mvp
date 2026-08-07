@@ -45,6 +45,21 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TEXT    NOT NULL,
     FOREIGN KEY (chat_id) REFERENCES chats(id)
 );
+
+CREATE TABLE IF NOT EXISTS coin_users (
+    session_id TEXT    PRIMARY KEY,
+    coins      INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS coin_transactions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id     TEXT    NOT NULL,
+    type           TEXT    NOT NULL,
+    amount         INTEGER NOT NULL,
+    stripe_session TEXT,
+    created_at     TEXT    NOT NULL
+);
 """
 
 
@@ -222,3 +237,66 @@ def chat_delete(chat_id: int) -> bool:
         con.execute("DELETE FROM chat_messages WHERE chat_id=?", (chat_id,))
         cur = con.execute("DELETE FROM chats WHERE id=?", (chat_id,))
         return cur.rowcount > 0
+
+
+# ── Coins ──────────────────────────────────────────────────────────────────────
+def coin_get_or_create(session_id: str) -> int:
+    """Return the coin balance for session_id, creating the row if needed."""
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT coins FROM coin_users WHERE session_id=?", (session_id,)
+        ).fetchone()
+        if row:
+            return row[0]
+        con.execute(
+            "INSERT INTO coin_users(session_id, coins, created_at) VALUES (?, 0, ?)",
+            (session_id, _utc()),
+        )
+        return 0
+
+
+def coin_balance(session_id: str) -> int:
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT coins FROM coin_users WHERE session_id=?", (session_id,)
+        ).fetchone()
+        return row[0] if row else 0
+
+
+def coin_spend(session_id: str, amount: int = 1) -> bool:
+    """Deduct coins. Returns False if insufficient balance."""
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT coins FROM coin_users WHERE session_id=?", (session_id,)
+        ).fetchone()
+        if not row or row[0] < amount:
+            return False
+        con.execute(
+            "UPDATE coin_users SET coins = coins - ? WHERE session_id=?",
+            (amount, session_id),
+        )
+        con.execute(
+            "INSERT INTO coin_transactions(session_id, type, amount, created_at) VALUES (?, 'spend', ?, ?)",
+            (session_id, -amount, _utc()),
+        )
+        return True
+
+
+def coin_credit(session_id: str, amount: int, stripe_session: str) -> None:
+    """Credit coins after a confirmed Stripe payment. Idempotent."""
+    with sqlite3.connect(DB_PATH) as con:
+        already = con.execute(
+            "SELECT id FROM coin_transactions WHERE stripe_session=?", (stripe_session,)
+        ).fetchone()
+        if already:
+            return
+        coin_get_or_create(session_id)
+        con.execute(
+            "UPDATE coin_users SET coins = coins + ? WHERE session_id=?",
+            (amount, session_id),
+        )
+        con.execute(
+            "INSERT INTO coin_transactions(session_id, type, amount, stripe_session, created_at) "
+            "VALUES (?, 'purchase', ?, ?, ?)",
+            (session_id, amount, stripe_session, _utc()),
+        )

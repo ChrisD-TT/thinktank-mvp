@@ -303,8 +303,8 @@ with st.sidebar:
     )
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_admin = st.tabs(
-    ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "⚙️ Admin"]
+tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_coins, tab_admin = st.tabs(
+    ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "💳 Buy Coins", "⚙️ Admin"]
 )
 
 # ==============================================================================
@@ -538,7 +538,24 @@ with tab_gate:
 # ASK TAB
 # ==============================================================================
 with tab_ask:
-    st.subheader("Ask / Chat")
+    # ── Coin balance for public users ─────────────────────────────────────────
+    import thinktank.engine.db as _askdb, importlib as _il
+    _askdb = _il.reload(_askdb)
+    if "coin_session_id" not in st.session_state:
+        import uuid as _u; st.session_state.coin_session_id = str(_u.uuid4())
+    _ask_sid = st.session_state.coin_session_id
+    _askdb.init_db()
+    _ask_bal = _askdb.coin_get_or_create(_ask_sid)
+
+    _bal_col, _buy_col = st.columns([3, 1])
+    with _bal_col:
+        st.subheader("Ask / Chat")
+    with _buy_col:
+        if _ask_bal > 0:
+            st.success(f"🪙 {_ask_bal} coins")
+        else:
+            st.warning("🪙 0 coins")
+            st.caption("[Buy coins →](#buy-coins)")
 
     chats   = chat_list(limit=50)
     chat_id = st.session_state.current_chat_id
@@ -610,16 +627,23 @@ with tab_ask:
     with a1:
         if st.button("💬 Send", use_container_width=True, type="primary"):
             if ask_text.strip() and chat_id:
-                with st.spinner("Thinking…"):
-                    try:
-                        run_ask(ask_text.strip(), chat_id)
-                        st.rerun()
-                    except Exception as e:
-                        err = str(e)
-                        if "Cannot reach Ollama" in err or "ollama" in err.lower():
-                            st.error("🔌 Ollama is offline. Run `ollama serve` then try again.")
-                        else:
-                            st.error(err)
+                # Check + deduct coin before calling AI
+                _has_coin = _askdb.coin_spend(_ask_sid, 1)
+                if not _has_coin:
+                    st.error("🪙 No coins remaining. Go to **Buy Coins** tab to top up.")
+                else:
+                    with st.spinner("Thinking…"):
+                        try:
+                            run_ask(ask_text.strip(), chat_id)
+                            st.rerun()
+                        except Exception as e:
+                            # Refund coin if AI call failed
+                            _askdb.coin_credit(_ask_sid, 1, f"refund-{_ask_sid}-{id(e)}")
+                            err = str(e)
+                            if "Cannot reach Ollama" in err or "ollama" in err.lower():
+                                st.error("🔌 Ollama is offline. Run `ollama serve` then try again.")
+                            else:
+                                st.error(err)
             else:
                 st.warning("Enter a message first.")
     with a2:
@@ -643,20 +667,156 @@ with tab_room:
     _room.run_room_app()
 
 # ==============================================================================
+# BUY COINS TAB
+# ==============================================================================
+with tab_coins:
+    try:
+        import stripe as _stripe
+        import uuid as _uuid
+
+        st.subheader("💳 Buy Coins")
+        st.caption("Coins power your ThinkTank AI sessions. Buy once, use anytime — coins never expire.")
+
+        def _sec(k):
+            try:
+                return st.secrets.get(k, "") or ""
+            except Exception:
+                return ""
+
+        _stripe_key = _sec("STRIPE_SECRET_KEY")
+
+        # ── Session ID ────────────────────────────────────────────────────────
+        if "coin_session_id" not in st.session_state:
+            st.session_state.coin_session_id = str(_uuid.uuid4())
+        _sid = st.session_state.coin_session_id
+
+        # ── Force reload so new coin functions are visible ────────────────────
+        import importlib, thinktank.engine.db as _coindb
+        _coindb = importlib.reload(_coindb)
+        _coindb.init_db()
+        _bal = _coindb.coin_get_or_create(_sid)
+        st.metric("Your Coin Balance", f"{_bal} coins")
+        st.divider()
+
+        # ── Packages ──────────────────────────────────────────────────────────
+        _PKGS = [
+            {"id": "starter",  "label": "Starter",  "coins": 40,  "price": "$3.99",  "price_id": _sec("STRIPE_PRICE_STARTER")},
+            {"id": "standard", "label": "Standard", "coins": 125, "price": "$7.99",  "price_id": _sec("STRIPE_PRICE_STANDARD")},
+            {"id": "pro",      "label": "Pro",       "coins": 450, "price": "$14.99", "price_id": _sec("STRIPE_PRICE_PRO")},
+        ]
+
+        _c1, _c2, _c3 = st.columns(3)
+        for _col, _pkg in zip([_c1, _c2, _c3], _PKGS):
+            with _col:
+                with st.container(border=True):
+                    st.markdown(f"### {_pkg['label']}")
+                    st.markdown(f"**{_pkg['coins']} coins**")
+                    st.markdown(f"**{_pkg['price']}** one-time")
+                    st.caption("Coins never expire")
+                    if st.button(f"Buy {_pkg['label']}", key=f"buy_{_pkg['id']}", type="primary", use_container_width=True):
+                        if not _stripe_key:
+                            st.error("Stripe not configured.")
+                        elif not _pkg["price_id"]:
+                            st.error(f"Price ID for {_pkg['label']} not set.")
+                        else:
+                            try:
+                                _stripe.api_key = _stripe_key
+                                _co = _stripe.checkout.Session.create(
+                                    mode="payment",
+                                    line_items=[{"price": _pkg["price_id"], "quantity": 1}],
+                                    success_url=(
+                                        "http://localhost:8501?purchase=success"
+                                        f"&coins={_pkg['coins']}&session={_sid}"
+                                    ),
+                                    cancel_url="http://localhost:8501?purchase=cancelled",
+                                    metadata={"session_id": _sid, "coins": str(_pkg["coins"]), "package": _pkg["id"]},
+                                )
+                                st.markdown(f"[👉 Click here to complete payment]({_co.url})")
+                                st.info("After payment, return here and your coins will be credited automatically.")
+                            except Exception as _e:
+                                st.error(f"Stripe error: {_e}")
+
+        st.divider()
+
+        # ── Handle return from Stripe ─────────────────────────────────────────
+        _qp = st.query_params
+        if _qp.get("purchase") == "success":
+            _return_coins = int(_qp.get("coins", "0"))
+            _return_sid   = _qp.get("session", _sid)
+            if _return_coins > 0:
+                # Credit coins directly from URL params as a reliable fallback
+                _coindb.coin_credit(
+                    _return_sid,
+                    _return_coins,
+                    f"url-credit-{_return_sid}-{_return_coins}"
+                )
+                # Also credit to current session if different (browser reopened)
+                if _return_sid != _sid:
+                    _coindb.coin_credit(
+                        _sid,
+                        _return_coins,
+                        f"url-credit-{_sid}-{_return_coins}"
+                    )
+            _bal_now = _coindb.coin_get_or_create(_sid)
+            st.success(f"✅ Payment confirmed! **{_bal_now} coins** are ready to use.")
+            if st.button("🔄 Continue"):
+                st.query_params.clear()
+                st.rerun()
+        elif _qp.get("purchase") == "cancelled":
+            st.warning("Purchase cancelled. No charge was made.")
+            st.query_params.clear()
+
+    except Exception as _coins_err:
+        st.error(f"Buy Coins error: {_coins_err}")
+        import traceback
+        st.code(traceback.format_exc())
+
+# ==============================================================================
 # ADMIN TAB
 # ==============================================================================
 with tab_admin:
     st.subheader("⚙️ Admin / Settings")
 
-    from thinktank.engine.ai import is_available
-    st.markdown("### 🔌 Ollama Status")
-    if st.button("Check Ollama Connection", type="primary"):
-        ok, msg = is_available(cfg.OLLAMA_MODEL)
-        if ok:
-            st.success(f"✅ Ollama is running · Model `{cfg.OLLAMA_MODEL}` is ready")
-        else:
-            st.error(f"❌ {msg}")
-            st.code(f"ollama serve\nollama pull {cfg.OLLAMA_MODEL}", language="bash")
+    from thinktank.engine.ai import is_available, chat as ai_chat
+
+    def _get_secret(key):
+        try:
+            return st.secrets.get(key, "") or ""
+        except Exception:
+            return ""
+
+    # ── AI Backend Status ─────────────────────────────────────────────────────
+    st.markdown("### 🤖 AI Backend Status")
+
+    gemini_key = _get_secret("GEMINI_API_KEY")
+    if gemini_key:
+        st.info("🟢 **Active provider: Gemini** — Ollama is available as fallback")
+    else:
+        st.info("🟡 **Active provider: Ollama** — Add GEMINI_API_KEY to secrets.toml to use Gemini")
+
+    col_ai1, col_ai2 = st.columns(2)
+
+    with col_ai1:
+        st.markdown("**Gemini (Google AI)**")
+        if st.button("Check Gemini Connection", type="primary"):
+            if not gemini_key:
+                st.warning("⚠️ No GEMINI_API_KEY found in secrets.toml")
+            else:
+                try:
+                    ai_chat([{"role": "user", "content": "ping"}])
+                    st.success("✅ Gemini is connected · Active AI provider")
+                except Exception as e:
+                    st.error(f"❌ Gemini error: {e}")
+
+    with col_ai2:
+        st.markdown("**Ollama (Local Fallback)**")
+        if st.button("Check Ollama Connection"):
+            ok, msg = is_available(cfg.OLLAMA_MODEL)
+            if ok:
+                st.success(f"✅ Ollama running · Model `{cfg.OLLAMA_MODEL}` ready")
+            else:
+                st.warning(f"⚠️ {msg}")
+                st.code(f"ollama serve\nollama pull {cfg.OLLAMA_MODEL}", language="bash")
 
     st.divider()
 
