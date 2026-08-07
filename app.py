@@ -671,8 +671,10 @@ with tab_room:
 # ==============================================================================
 with tab_coins:
     try:
-        import stripe as _stripe
         import uuid as _uuid
+        import urllib.request as _ureq
+        import urllib.parse as _uparse
+        import json as _json
 
         st.subheader("💳 Buy Coins")
         st.caption("Coins power your ThinkTank AI sessions. Buy once, use anytime — coins never expire.")
@@ -686,6 +688,28 @@ with tab_coins:
                 return os.environ.get(k, "")
 
         _stripe_key = _sec("STRIPE_SECRET_KEY")
+
+        def _stripe_checkout(price_id, coins, session_id, api_key):
+            """Call Stripe Checkout API directly — no SDK, no encoding issues."""
+            base = "https://web-production-69268.up.railway.app"
+            params = _uparse.urlencode({
+                "mode": "payment",
+                "line_items[0][price]": price_id,
+                "line_items[0][quantity]": "1",
+                "success_url": f"{base}?purchase=success&coins={coins}&session={session_id}",
+                "cancel_url": f"{base}?purchase=cancelled",
+                "metadata[session_id]": session_id,
+                "metadata[coins]": str(coins),
+            }).encode("ascii")
+            token = (__import__("base64").b64encode(f"{api_key}:".encode("ascii")).decode("ascii"))
+            req = _ureq.Request(
+                "https://api.stripe.com/v1/checkout/sessions",
+                data=params,
+                headers={"Authorization": f"Basic {token}"},
+                method="POST",
+            )
+            with _ureq.urlopen(req, timeout=30) as resp:
+                return _json.loads(resp.read().decode("utf-8"))
 
         # ── Session ID ────────────────────────────────────────────────────────
         if "coin_session_id" not in st.session_state:
@@ -722,21 +746,13 @@ with tab_coins:
                             st.error(f"Price ID for {_pkg['label']} not set.")
                         else:
                             try:
-                                _stripe.api_key = _stripe_key
-                                _co = _stripe.checkout.Session.create(
-                                    mode="payment",
-                                    line_items=[{"price": _pkg["price_id"], "quantity": 1}],
-                                    success_url=(
-                                        "https://web-production-69268.up.railway.app?purchase=success"
-                                        f"&coins={_pkg['coins']}&session={_sid}"
-                                    ),
-                                    cancel_url="https://web-production-69268.up.railway.app?purchase=cancelled",
-                                    metadata={"session_id": _sid, "coins": str(_pkg["coins"]), "package": _pkg["id"]},
+                                _co = _stripe_checkout(
+                                    _pkg["price_id"], _pkg["coins"], _sid, _stripe_key
                                 )
-                                st.markdown(f"[👉 Click here to complete payment]({_co.url})")
+                                st.markdown(f"[👉 Click here to complete payment]({_co['url']})")
                                 st.info("After payment, return here and your coins will be credited automatically.")
                             except Exception as _e:
-                                st.error(f"Stripe error: {_e}")
+                                st.error(f"Payment error: {_e}")
 
         st.divider()
 
