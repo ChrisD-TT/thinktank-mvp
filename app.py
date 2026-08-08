@@ -305,6 +305,51 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    st.divider()
+    _share_url  = "https://web-production-69268.up.railway.app"
+    _share_text = "Just tried ThinkTank — an AI-powered decision engine that helps you think faster and take action with less risk. Check it out 👇"
+    import urllib.parse as _sp
+    _tw  = f"https://twitter.com/intent/tweet?text={_sp.quote(_share_text)}&url={_sp.quote(_share_url)}"
+    _li  = f"https://www.linkedin.com/sharing/share-offsite/?url={_sp.quote(_share_url)}"
+    _wa  = f"https://wa.me/?text={_sp.quote(_share_text + ' ' + _share_url)}"
+    st.markdown(
+        f"""
+        <div style="text-align:center;">
+            <div style="font-size:0.78rem;font-weight:700;color:#888;
+                        text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">
+                Share ThinkTank
+            </div>
+            <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
+                <a href="{_tw}" target="_blank" rel="noopener"
+                   style="display:inline-block;background:#000;color:#fff;
+                          text-decoration:none;font-size:0.75rem;font-weight:700;
+                          padding:7px 14px;border-radius:5px;">
+                    𝕏 Twitter
+                </a>
+                <a href="{_li}" target="_blank" rel="noopener"
+                   style="display:inline-block;background:#0a66c2;color:#fff;
+                          text-decoration:none;font-size:0.75rem;font-weight:700;
+                          padding:7px 14px;border-radius:5px;">
+                    in LinkedIn
+                </a>
+                <a href="{_wa}" target="_blank" rel="noopener"
+                   style="display:inline-block;background:#25d366;color:#fff;
+                          text-decoration:none;font-size:0.75rem;font-weight:700;
+                          padding:7px 14px;border-radius:5px;">
+                    💬 WhatsApp
+                </a>
+            </div>
+            <div style="margin-top:8px;">
+                <a href="{_share_url}" target="_blank" rel="noopener"
+                   style="font-size:0.68rem;color:#888;text-decoration:none;">
+                    🔗 {_share_url}
+                </a>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_coins, tab_admin = st.tabs(
     ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "💳 Buy Coins", "⚙️ Admin"]
