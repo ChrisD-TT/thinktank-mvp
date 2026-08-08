@@ -246,9 +246,59 @@ if st.session_state.current_chat_id is None:
     st.session_state.current_chat_id = ensure_default_chat()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+from thinktank.engine.db import user_register, user_login, user_merge_session
+
+if "auth_user" not in st.session_state:
+    st.session_state.auth_user = None   # None = logged out, str = email
+
+def _auth_sid():
+    """Return the session ID to use for coins — email if logged in, anon sid otherwise."""
+    return st.session_state.auth_user if st.session_state.auth_user else st.session_state.get("_GLOBAL_SID", "anon")
+
 with st.sidebar:
     st.title("🧠 ThinkTank")
     st.caption("Powered by OpenAI · gpt-4o-mini")
+    st.divider()
+
+    # ── Login / Register ───────────────────────────────────────────────────
+    if st.session_state.auth_user:
+        st.success(f"👤 {st.session_state.auth_user}")
+        if st.button("Log out", key="sidebar_logout", use_container_width=True):
+            st.session_state.auth_user = None
+            st.rerun()
+    else:
+        with st.expander("🔑 Log in / Register", expanded=False):
+            _auth_tab = st.radio("", ["Log in", "Register"], horizontal=True, key="auth_mode", label_visibility="collapsed")
+            _auth_email = st.text_input("Email", key="auth_email", placeholder="you@example.com")
+            _auth_pw    = st.text_input("Password", key="auth_pw", type="password", placeholder="Min 6 characters")
+            if _auth_tab == "Log in":
+                if st.button("Log in", key="do_login", type="primary", use_container_width=True):
+                    _res = user_login(_auth_email, _auth_pw)
+                    if _res["ok"]:
+                        # merge any anon coins into the account
+                        _anon = st.session_state.get("_GLOBAL_SID", "")
+                        if _anon:
+                            user_merge_session(_res["email"], _anon)
+                        st.session_state.auth_user = _res["email"]
+                        st.success("Welcome back!")
+                        st.rerun()
+                    else:
+                        st.error(_res["error"])
+            else:
+                if st.button("Create account", key="do_register", type="primary", use_container_width=True):
+                    _res = user_register(_auth_email, _auth_pw)
+                    if _res["ok"]:
+                        _anon = st.session_state.get("_GLOBAL_SID", "")
+                        if _anon:
+                            user_merge_session(_res["email"], _anon)
+                        st.session_state.auth_user = _res["email"]
+                        st.success("Account created! Welcome 🎉")
+                        st.rerun()
+                    else:
+                        st.error(_res["error"])
+            st.caption("Your coins are saved to your account across all browsers.")
+
     st.divider()
 
     st.subheader("Recent Ideas")
@@ -775,10 +825,11 @@ with tab_coins:
                 return ""
 
         # ── Session + balance (must come before any use of _bal) ─────────────
+        # If logged in, use email as the persistent wallet ID
         if "coin_session_id" not in st.session_state:
             import uuid as _uuid2
             st.session_state.coin_session_id = str(_uuid2.uuid4())
-        _sid_early = st.session_state.coin_session_id
+        _sid_early = _auth_sid() if st.session_state.auth_user else st.session_state.coin_session_id
         import importlib as _il2, thinktank.engine.db as _earlydb
         _earlydb = _il2.reload(_earlydb)
         _earlydb.init_db()

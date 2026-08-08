@@ -1,9 +1,10 @@
 """
 ThinkTank — SQLite persistence layer.
-Handles: ideas, gate_history, chats, chat_messages.
+Handles: ideas, gate_history, chats, chat_messages, users, coins.
 """
 
 import json
+import hashlib
 import sqlite3
 from datetime import datetime, timezone
 from thinktank.config import DB_PATH
@@ -44,6 +45,13 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     content    TEXT    NOT NULL,
     created_at TEXT    NOT NULL,
     FOREIGN KEY (chat_id) REFERENCES chats(id)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    email        TEXT    NOT NULL UNIQUE,
+    password_hash TEXT   NOT NULL,
+    created_at   TEXT    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS coin_users (
@@ -237,6 +245,76 @@ def chat_delete(chat_id: int) -> bool:
         con.execute("DELETE FROM chat_messages WHERE chat_id=?", (chat_id,))
         cur = con.execute("DELETE FROM chats WHERE id=?", (chat_id,))
         return cur.rowcount > 0
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+def _hash_pw(password: str) -> str:
+    return hashlib.sha256(password.strip().encode("utf-8")).hexdigest()
+
+
+def user_register(email: str, password: str) -> dict:
+    """Register a new user. Returns {'ok': True, 'user_id': int} or {'ok': False, 'error': str}."""
+    email = email.strip().lower()
+    if not email or "@" not in email:
+        return {"ok": False, "error": "Invalid email address."}
+    if len(password) < 6:
+        return {"ok": False, "error": "Password must be at least 6 characters."}
+    try:
+        with sqlite3.connect(DB_PATH) as con:
+            cur = con.execute(
+                "INSERT INTO users(email, password_hash, created_at) VALUES (?, ?, ?)",
+                (email, _hash_pw(password), _utc()),
+            )
+            user_id = int(cur.lastrowid)
+            # create coin wallet using email as session_id so it persists
+            _ensure_coin_wallet(con, email)
+            return {"ok": True, "user_id": user_id, "email": email}
+    except sqlite3.IntegrityError:
+        return {"ok": False, "error": "An account with that email already exists."}
+
+
+def user_login(email: str, password: str) -> dict:
+    """Verify credentials. Returns {'ok': True, 'user_id': int, 'email': str} or {'ok': False, 'error': str}."""
+    email = email.strip().lower()
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT id, password_hash FROM users WHERE email=?", (email,)
+        ).fetchone()
+    if not row or row[1] != _hash_pw(password):
+        return {"ok": False, "error": "Invalid email or password."}
+    return {"ok": True, "user_id": row[0], "email": email}
+
+
+def user_merge_session(email: str, anon_session_id: str) -> None:
+    """Merge coins from an anonymous session into the user's account after login."""
+    with sqlite3.connect(DB_PATH) as con:
+        anon = con.execute(
+            "SELECT coins FROM coin_users WHERE session_id=?", (anon_session_id,)
+        ).fetchone()
+        if anon and anon[0] > 0:
+            # add anon coins to the user account
+            con.execute(
+                "UPDATE coin_users SET coins = coins + ? WHERE session_id=?",
+                (anon[0], email),
+            )
+            con.execute(
+                "INSERT INTO coin_transactions(session_id, type, amount, stripe_session, created_at) "
+                "VALUES (?, 'merge', ?, ?, ?)",
+                (email, anon[0], f"merge-{anon_session_id}", _utc()),
+            )
+            # zero out the anon session so it can't be merged again
+            con.execute(
+                "UPDATE coin_users SET coins=0 WHERE session_id=?", (anon_session_id,)
+            )
+
+
+def _ensure_coin_wallet(con, session_id: str) -> None:
+    """Create coin wallet if it doesn't exist (used internally)."""
+    con.execute(
+        "INSERT OR IGNORE INTO coin_users(session_id, coins, created_at) VALUES (?, 0, ?)",
+        (session_id, _utc()),
+    )
 
 
 # ── Coins ──────────────────────────────────────────────────────────────────────
