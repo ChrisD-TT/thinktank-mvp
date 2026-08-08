@@ -308,6 +308,51 @@ tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_coins, tab_admin = st.
 )
 
 # ==============================================================================
+# GLOBAL: Stripe return handler — runs on every page load regardless of active tab
+# ==============================================================================
+def _get_coin_session():
+    import uuid as _u2, importlib as _il3
+    import thinktank.engine.db as _gdb
+    _gdb = _il3.reload(_gdb)
+    _gdb.init_db()
+    if "coin_session_id" not in st.session_state:
+        st.session_state.coin_session_id = str(_u2.uuid4())
+    sid = st.session_state.coin_session_id
+    _gdb.coin_get_or_create(sid)
+    return sid, _gdb
+
+_g_qp = st.query_params
+if _g_qp.get("purchase") == "success":
+    _g_sid, _g_db = _get_coin_session()
+    _g_coins   = int(_g_qp.get("coins", "0"))
+    _g_ret_sid = _g_qp.get("session", _g_sid)
+    if _g_coins > 0:
+        _g_db.coin_credit(_g_ret_sid, _g_coins, f"url-{_g_ret_sid}-{_g_coins}")
+        if _g_ret_sid != _g_sid:
+            _g_db.coin_credit(_g_sid, _g_coins, f"url-{_g_sid}-{_g_coins}")
+    _g_bal = _g_db.coin_get_or_create(_g_sid)
+    st.success(f"✅ Payment confirmed! You now have **{_g_bal} coins**. Head to 💬 Ask to use them.")
+    st.query_params.clear()
+elif _g_qp.get("purchase") == "cancelled":
+    st.warning("Purchase cancelled — no charge was made.")
+    st.query_params.clear()
+
+# ── Helper: coin gate used by Ideas, Analysis, Gate tabs ─────────────────────
+def _require_coins(amount: int, action: str):
+    """Deduct coins. Shows error and returns False if insufficient."""
+    sid, db = _get_coin_session()
+    if not db.coin_spend(sid, amount):
+        bal = db.coin_balance(sid)
+        st.error(f"🪙 Not enough coins — **{action}** costs {amount} coin{'s' if amount > 1 else ''}. You have {bal}. Go to 💳 Buy Coins to top up.")
+        return False
+    return True
+
+def _refund_coins(amount: int, reason: str = ""):
+    """Refund coins on AI failure."""
+    sid, db = _get_coin_session()
+    db.coin_credit(sid, amount, f"refund-{sid}-{reason}")
+
+# ==============================================================================
 # IDEAS TAB
 # ==============================================================================
 with tab_ideas:
@@ -320,22 +365,20 @@ with tab_ideas:
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("💾 Save + Rapid Bounce", use_container_width=True, type="primary"):
-            if idea_text.strip():
-                with st.spinner("Running Rapid Bounce…"):
-                    try:
-                        result = run_idea(idea_text.strip())
-                        st.session_state.selected_idea_id    = result["idea_id"]
-                        st.session_state.rapid_bounce_output = result["output"]
-                        st.success(f"✅ Saved as Idea #{result['idea_id']} — scroll down for output")
-                    except Exception as e:
-                        err = str(e)
-                        if "Cannot reach Ollama" in err or "ollama" in err.lower():
-                            st.error("🔌 Ollama is offline. Run `ollama serve` then try again.")
-                        else:
-                            st.error(f"Error: {err}")
-            else:
-                st.warning("Enter an idea first.")
+        if st.button("💾 Save + Rapid Bounce  🪙 1 coin", use_container_width=True, type="primary"):
+                if idea_text.strip():
+                    if _require_coins(1, "Rapid Bounce"):
+                        with st.spinner("Running Rapid Bounce…"):
+                            try:
+                                result = run_idea(idea_text.strip())
+                                st.session_state.selected_idea_id    = result["idea_id"]
+                                st.session_state.rapid_bounce_output = result["output"]
+                                st.success(f"✅ Saved as Idea #{result['idea_id']} — scroll down for output")
+                            except Exception as e:
+                                _refund_coins(1, "idea")
+                                st.error(f"Error: {e}")
+                else:
+                    st.warning("Enter an idea first.")
     with col2:
         if st.button("🔄 Refresh", use_container_width=True):
             st.rerun()
@@ -391,32 +434,35 @@ with tab_analysis:
 
             c1, c2, c3 = st.columns(3)
             with c1:
-                if st.button("📝 Refine", use_container_width=True, type="primary"):
-                    with st.spinner("Refining…"):
-                        try:
-                            r = run_refine(sel)
-                            st.session_state.refine_output = r.get("output", r.get("error"))
-                        except Exception as e:
-                            err = str(e)
-                            st.session_state.refine_output = "🔌 Ollama offline — run `ollama serve`" if "ollama" in err.lower() or "Cannot reach" in err else err
+                if st.button("📝 Refine  🪙 2", use_container_width=True, type="primary"):
+                    if _require_coins(2, "Refine"):
+                        with st.spinner("Refining…"):
+                            try:
+                                r = run_refine(sel)
+                                st.session_state.refine_output = r.get("output", r.get("error"))
+                            except Exception as e:
+                                _refund_coins(2, "refine")
+                                st.session_state.refine_output = f"Error: {e}"
             with c2:
-                if st.button("📈 Score", use_container_width=True, type="primary"):
-                    with st.spinner("Scoring…"):
-                        try:
-                            r = run_score(sel)
-                            st.session_state.score_output = r.get("output", r.get("error"))
-                        except Exception as e:
-                            err = str(e)
-                            st.session_state.score_output = "🔌 Ollama offline — run `ollama serve`" if "ollama" in err.lower() or "Cannot reach" in err else err
+                if st.button("📈 Score  🪙 2", use_container_width=True, type="primary"):
+                    if _require_coins(2, "Score"):
+                        with st.spinner("Scoring…"):
+                            try:
+                                r = run_score(sel)
+                                st.session_state.score_output = r.get("output", r.get("error"))
+                            except Exception as e:
+                                _refund_coins(2, "score")
+                                st.session_state.score_output = f"Error: {e}"
             with c3:
-                if st.button("🔍 Critique", use_container_width=True, type="primary"):
-                    with st.spinner("Critiquing…"):
-                        try:
-                            r = run_critique(sel)
-                            st.session_state.critique_output = r.get("output", r.get("error"))
-                        except Exception as e:
-                            err = str(e)
-                            st.session_state.critique_output = "🔌 Ollama offline — run `ollama serve`" if "ollama" in err.lower() or "Cannot reach" in err else err
+                if st.button("🔍 Critique  🪙 2", use_container_width=True, type="primary"):
+                    if _require_coins(2, "Critique"):
+                        with st.spinner("Critiquing…"):
+                            try:
+                                r = run_critique(sel)
+                                st.session_state.critique_output = r.get("output", r.get("error"))
+                            except Exception as e:
+                                _refund_coins(2, "critique")
+                                st.session_state.critique_output = f"Error: {e}"
 
             left, right = st.columns(2)
             with left:
@@ -463,17 +509,15 @@ with tab_gate:
                     "stop_impact_<=":    cfg.GATE_STOP_MAX_IMPACT,
                 })
 
-            if st.button("🚦 Run Gate", use_container_width=True, type="primary"):
-                with st.spinner("Running Score + Critique + Gate…"):
-                    try:
-                        result = run_gate(sel)
-                        st.session_state.gate_output = result
-                    except Exception as e:
-                        err = str(e)
-                        if "Cannot reach Ollama" in err or "ollama" in err.lower():
-                            st.error("🔌 Ollama is offline. Run `ollama serve` then try again.")
-                        else:
-                            st.error(f"Gate error: {err}")
+            if st.button("🚦 Run Gate  🪙 2 coins", use_container_width=True, type="primary"):
+                if _require_coins(2, "Run Gate"):
+                    with st.spinner("Running Score + Critique + Gate…"):
+                        try:
+                            result = run_gate(sel)
+                            st.session_state.gate_output = result
+                        except Exception as e:
+                            _refund_coins(2, "gate")
+                            st.error(f"Gate error: {e}")
 
             gs = st.session_state.gate_output
             if gs and gs.get("idea_id") == sel:
@@ -728,9 +772,9 @@ with tab_coins:
 
         # ── Packages (shown first so they're visible without scrolling) ───────
         _PKGS = [
-            {"id": "starter",  "label": "Starter",  "coins": 40,  "price": "$3.99",  "price_id": _sec("STRIPE_PRICE_STARTER")},
-            {"id": "standard", "label": "Standard", "coins": 125, "price": "$7.99",  "price_id": _sec("STRIPE_PRICE_STANDARD")},
-            {"id": "pro",      "label": "Pro",       "coins": 450, "price": "$14.99", "price_id": _sec("STRIPE_PRICE_PRO")},
+            {"id": "starter",  "label": "Starter",  "coins": 25,  "price": "$4.99",  "price_id": _sec("STRIPE_PRICE_STARTER")},
+            {"id": "standard", "label": "Standard", "coins": 60,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STANDARD")},
+            {"id": "pro",      "label": "Pro",       "coins": 150, "price": "$19.99", "price_id": _sec("STRIPE_PRICE_PRO")},
         ]
 
         _c1, _c2, _c3 = st.columns(3)

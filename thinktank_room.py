@@ -12,6 +12,31 @@ from thinktank import config as cfg
 from thinktank.engine.gate import compute_gate
 from thinktank.engine.ai import chat as ollama_chat
 
+
+def _room_coin_op(amount: int, action: str) -> bool:
+    """Spend coins for a Room AI action. Returns False if insufficient."""
+    import streamlit as st, os, importlib, uuid
+    import thinktank.engine.db as _rdb
+    _rdb = importlib.reload(_rdb)
+    _rdb.init_db()
+    if "coin_session_id" not in st.session_state:
+        st.session_state.coin_session_id = str(uuid.uuid4())
+    sid = st.session_state.coin_session_id
+    _rdb.coin_get_or_create(sid)
+    if not _rdb.coin_spend(sid, amount):
+        bal = _rdb.coin_balance(sid)
+        st.error(f"🪙 Not enough coins — **{action}** costs {amount} coin{'s' if amount > 1 else ''}. You have {bal}. Go to 💳 Buy Coins.")
+        return False
+    return True
+
+def _room_refund(amount: int, reason: str = ""):
+    import streamlit as st, importlib
+    import thinktank.engine.db as _rdb
+    _rdb = importlib.reload(_rdb)
+    sid = st.session_state.get("coin_session_id", "")
+    if sid:
+        _rdb.coin_credit(sid, amount, f"refund-room-{sid}-{reason}")
+
 # ── Config ────────────────────────────────────────────────────────────────────
 DB_PATH     = cfg.DB_PATH
 MAX_SEATS   = 5
@@ -680,26 +705,32 @@ def run_room_app():
 
                     # ── AI response rules ──────────────────────────────────
                     if post_type == "idea":
-                        idea_count = len(get_idea_posts(room["id"]))
-                        trigger = (
-                            f'New idea from {me}: "{content}". '
-                            f'There are now {idea_count} idea(s) on the table. '
-                            f'Comment briefly on this idea, then note any convergence '
-                            f'or divergence with other ideas already on the table.'
-                        )
-                        with st.spinner("Dealer is reviewing the idea…"):
-                            dealer_text = dealer_respond(room["id"], trigger)
-                        if "AI backend unavailable" in dealer_text:
-                            st.error("🔌 Ollama is offline — start it with `ollama serve` then post again.")
-                        add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
+                        if _room_coin_op(2, "Idea submission (AI dealer review)"):
+                            idea_count = len(get_idea_posts(room["id"]))
+                            trigger = (
+                                f'New idea from {me}: "{content}". '
+                                f'There are now {idea_count} idea(s) on the table. '
+                                f'Comment briefly on this idea, then note any convergence '
+                                f'or divergence with other ideas already on the table.'
+                            )
+                            with st.spinner("Dealer is reviewing the idea… 🪙 2 coins"):
+                                dealer_text = dealer_respond(room["id"], trigger)
+                            if "AI backend unavailable" in dealer_text:
+                                _room_refund(2, "idea-fail")
+                                st.error("AI dealer is unavailable. Coins refunded.")
+                            else:
+                                add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
 
                     elif post_type == "ask":
-                        trigger = f'{me} asked: "{content}"'
-                        with st.spinner("Dealer is thinking…"):
-                            dealer_text = dealer_respond(room["id"], trigger)
-                        if "AI backend unavailable" in dealer_text:
-                            st.error("🔌 Ollama is offline — start it with `ollama serve` then post again.")
-                        add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
+                        if _room_coin_op(1, "Ask the dealer"):
+                            trigger = f'{me} asked: "{content}"'
+                            with st.spinner("Dealer is thinking… 🪙 1 coin"):
+                                dealer_text = dealer_respond(room["id"], trigger)
+                            if "AI backend unavailable" in dealer_text:
+                                _room_refund(1, "ask-fail")
+                                st.error("AI dealer is unavailable. Coin refunded.")
+                            else:
+                                add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
 
                     # message type — no AI, just posts to the board
                     st.rerun()
