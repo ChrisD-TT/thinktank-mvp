@@ -671,12 +671,6 @@ with tab_coins:
         import urllib.parse as _uparse
         import json as _json
 
-        st.subheader("💳 Buy Coins")
-        st.caption("Coins power your ThinkTank AI sessions. Buy once, use anytime — coins never expire.")
-        if _bal == 5 and not st.session_state.get("welcome_shown"):
-            st.success("🎁 Welcome! You've been given **5 free coins** to try ThinkTank. Head to the 💬 Ask tab to use them.")
-            st.session_state.welcome_shown = True
-
         def _sec(k):
             import os
             try:
@@ -684,6 +678,22 @@ with tab_coins:
                 return val if val else os.environ.get(k, "")
             except Exception:
                 return os.environ.get(k, "")
+
+        # ── Session + balance (must come before any use of _bal) ─────────────
+        if "coin_session_id" not in st.session_state:
+            import uuid as _uuid2
+            st.session_state.coin_session_id = str(_uuid2.uuid4())
+        _sid_early = st.session_state.coin_session_id
+        import importlib as _il2, thinktank.engine.db as _earlydb
+        _earlydb = _il2.reload(_earlydb)
+        _earlydb.init_db()
+        _bal = _earlydb.coin_get_or_create(_sid_early)
+
+        st.subheader("💳 Buy Coins")
+        st.caption("Coins power your ThinkTank AI sessions. Buy once, use anytime — coins never expire.")
+        if _bal == 5 and not st.session_state.get("welcome_shown"):
+            st.success("🎁 Welcome! You've been given **5 free coins** to try ThinkTank. Head to the 💬 Ask tab to use them.")
+            st.session_state.welcome_shown = True
 
         _stripe_key = _sec("STRIPE_SECRET_KEY").encode("ascii", errors="ignore").decode("ascii").strip()
 
@@ -712,15 +722,9 @@ with tab_coins:
                 return _json.loads(resp.read().decode("utf-8"))
 
         # ── Session ID ────────────────────────────────────────────────────────
-        if "coin_session_id" not in st.session_state:
-            st.session_state.coin_session_id = str(_uuid.uuid4())
-        _sid = st.session_state.coin_session_id
-
-        # ── Force reload so new coin functions are visible ────────────────────
-        import importlib, thinktank.engine.db as _coindb
-        _coindb = importlib.reload(_coindb)
-        _coindb.init_db()
-        _bal = _coindb.coin_get_or_create(_sid)
+        # _sid and _bal already set above — just alias for clarity
+        _sid    = _sid_early
+        _coindb = _earlydb
 
         # ── Packages (shown first so they're visible without scrolling) ───────
         _PKGS = [
@@ -905,34 +909,6 @@ with tab_admin:
     s1.metric("Ideas stored",   ideas_count)
     s2.metric("Gate decisions", gates_count)
     s3.metric("Chat threads",   chats_count)
-
-    st.divider()
-
-    st.markdown("### ♥ Support the Creator")
-    st.markdown(
-        """
-        <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;
-                    padding:24px 28px;text-align:center;max-width:480px;margin:0 auto;">
-            <div style="font-size:1.05rem;font-weight:700;color:#f0f0f0;margin-bottom:6px;">
-                Chris Dovico
-            </div>
-            <div style="font-size:0.85rem;color:#888;margin-bottom:18px;line-height:1.6;">
-                ThinkTank is free and open-source. If it saves you time or helps your team
-                make better decisions, consider buying me a coffee.
-            </div>
-            <a href="https://paypal.me/CDovico" target="_blank" rel="noopener"
-               style="display:inline-block;background:#003087;color:#fff;
-                      text-decoration:none;font-size:0.9rem;font-weight:700;
-                      padding:12px 36px;border-radius:6px;letter-spacing:0.05em;">
-                &#x2665;&nbsp; Donate via PayPal
-            </a>
-            <div style="font-size:0.72rem;color:#555;margin-top:10px;">
-                paypal.me/CDovico &nbsp;&bull;&nbsp; Any amount is appreciated
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     st.divider()
 
