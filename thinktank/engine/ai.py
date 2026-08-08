@@ -13,8 +13,7 @@ import urllib.request
 from thinktank.config import OLLAMA_BASE_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT
 
 
-GEMINI_MODEL   = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
 
 
 def _secret(key: str) -> str:
@@ -30,27 +29,36 @@ def _secret(key: str) -> str:
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 def _gemini_chat(messages: list[dict]) -> str:
-    api_key = _secret("GEMINI_API_KEY")
-    # Convert OpenAI-style messages to Gemini format
-    contents = []
+    """Use google-generativeai SDK — supports both AIza and AQ. key formats."""
+    import google.generativeai as genai
+
+    api_key = _secret("GEMINI_API_KEY").strip()
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(GEMINI_MODEL)
+
+    # Convert to SDK format — system messages become first user turn
+    history = []
+    prompt  = ""
     for m in messages:
-        role = "user" if m["role"] in ("user", "system") else "model"
-        contents.append({"role": role, "parts": [{"text": m["content"]}]})
+        if m["role"] == "system":
+            # Prepend system content to first user message
+            prompt = m["content"] + "\n\n"
+        elif m["role"] == "user":
+            history.append({"role": "user", "parts": [prompt + m["content"]]})
+            prompt = ""
+        elif m["role"] == "assistant":
+            history.append({"role": "model", "parts": [m["content"]]})
 
-    payload = json.dumps({
-        "contents": contents,
-        "generationConfig": {"maxOutputTokens": 2048},
-    }).encode("utf-8")
+    if not history:
+        history = [{"role": "user", "parts": ["Hello"]}]
 
-    url = GEMINI_API_URL.format(model=GEMINI_MODEL, key=api_key)
-    req = urllib.request.Request(
-        url, data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
-    return result["candidates"][0]["content"]["parts"][0]["text"].strip()
+    # Last message is the actual prompt; rest is history
+    last    = history[-1]["parts"][0]
+    past    = history[:-1]
+
+    chat    = model.start_chat(history=past)
+    resp    = chat.send_message(last)
+    return resp.text.strip()
 
 
 # ── Ollama (local fallback) ───────────────────────────────────────────────────
