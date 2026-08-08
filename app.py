@@ -248,7 +248,7 @@ if st.session_state.current_chat_id is None:
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("🧠 ThinkTank")
-    st.caption("Powered by Ollama · " + cfg.OLLAMA_MODEL)
+    st.caption("Powered by OpenAI · gpt-4o-mini")
     st.divider()
 
     st.subheader("Recent Ideas")
@@ -315,9 +315,17 @@ def _get_coin_session():
     import thinktank.engine.db as _gdb
     _gdb = _il3.reload(_gdb)
     _gdb.init_db()
-    if "coin_session_id" not in st.session_state:
+    # Persist session ID in URL so it survives page refresh
+    _qp_sid = st.query_params.get("sid", "")
+    if _qp_sid:
+        st.session_state.coin_session_id = _qp_sid
+    elif "coin_session_id" not in st.session_state:
         st.session_state.coin_session_id = str(_u2.uuid4())
+        st.query_params["sid"] = st.session_state.coin_session_id
     sid = st.session_state.coin_session_id
+    # Always write sid to URL so it persists across refreshes
+    if st.query_params.get("sid", "") != sid:
+        st.query_params["sid"] = sid
     _gdb.coin_get_or_create(sid)
     return sid, _gdb
 

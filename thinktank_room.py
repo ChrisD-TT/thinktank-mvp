@@ -720,6 +720,7 @@ def run_room_app():
                                 st.error("AI dealer is unavailable. Coins refunded.")
                             else:
                                 add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
+                        st.rerun()
 
                     elif post_type == "ask":
                         if _room_coin_op(1, "Ask the dealer"):
@@ -731,9 +732,11 @@ def run_room_app():
                                 st.error("AI dealer is unavailable. Coin refunded.")
                             else:
                                 add_post(room["id"], DEALER_NAME, dealer_text, post_type="dealer")
+                        st.rerun()
 
-                    # message type — no AI, just posts to the board
-                    st.rerun()
+                    else:
+                        # message type — no AI, just posts to the board
+                        st.rerun()
                 else:
                     st.warning("Nothing to post.")
 
