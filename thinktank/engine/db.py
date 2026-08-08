@@ -244,21 +244,33 @@ WELCOME_COINS = 5  # Free coins every new user receives on first visit
 
 def coin_get_or_create(session_id: str) -> int:
     """Return the coin balance for session_id, creating the row if needed.
-    New users receive WELCOME_COINS for free."""
+    New users receive WELCOME_COINS for free — only once per session_id."""
     with sqlite3.connect(DB_PATH) as con:
         row = con.execute(
             "SELECT coins FROM coin_users WHERE session_id=?", (session_id,)
         ).fetchone()
         if row:
             return row[0]
+        # New session — grant welcome coins with a unique per-session key
+        welcome_key = f"welcome-{session_id}"
+        already = con.execute(
+            "SELECT id FROM coin_transactions WHERE stripe_session=?", (welcome_key,)
+        ).fetchone()
+        if already:
+            # Row somehow missing but transaction exists — restore with 0
+            con.execute(
+                "INSERT OR IGNORE INTO coin_users(session_id, coins, created_at) VALUES (?, 0, ?)",
+                (session_id, _utc()),
+            )
+            return 0
         con.execute(
             "INSERT INTO coin_users(session_id, coins, created_at) VALUES (?, ?, ?)",
             (session_id, WELCOME_COINS, _utc()),
         )
         con.execute(
             "INSERT INTO coin_transactions(session_id, type, amount, stripe_session, created_at) "
-            "VALUES (?, 'welcome', ?, 'welcome-bonus', ?)",
-            (session_id, WELCOME_COINS, _utc()),
+            "VALUES (?, 'welcome', ?, ?, ?)",
+            (session_id, WELCOME_COINS, welcome_key, _utc()),
         )
         return WELCOME_COINS
 

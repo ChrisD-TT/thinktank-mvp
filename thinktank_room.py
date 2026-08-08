@@ -25,8 +25,13 @@ def _room_coin_op(amount: int, action: str) -> bool:
     _rdb.coin_get_or_create(sid)
     if not _rdb.coin_spend(sid, amount):
         bal = _rdb.coin_balance(sid)
-        st.error(f"🪙 Not enough coins — **{action}** costs {amount} coin{'s' if amount > 1 else ''}. You have {bal}. Go to 💳 Buy Coins.")
+        # Store in session state so it persists through rerun
+        st.session_state["_room_coin_err"] = (
+            f"🪙 **Not enough coins** — {action} costs **{amount} coin{'s' if amount > 1 else ''}**. "
+            f"You have **{bal} coins**. Go to the 💳 Buy Coins tab to top up."
+        )
         return False
+    st.session_state.pop("_room_coin_err", None)
     return True
 
 def _room_refund(amount: int, reason: str = ""):
@@ -228,13 +233,15 @@ def get_post_count(room_id: int) -> int:
 
 def build_transcript(room: dict, posts: list) -> str:
     """Build a plain-text transcript of all posts for download."""
+    pw = (room.get("password") or "").strip()
     lines = [
         f"ThinkTank Room Transcript",
         f"=" * 40,
-        f"Room:    {room['name']}",
-        f"Topic:   {room['topic']}",
-        f"Status:  {room['status']}",
-        f"Created: {room['created_at']}",
+        f"Room:     {room['name']}",
+        f"Topic:    {room['topic']}",
+        f"Password: {pw if pw else '(no password)'}",
+        f"Status:   {room['status']}",
+        f"Created:  {room['created_at']}",
         f"=" * 40,
         "",
     ]
@@ -695,6 +702,12 @@ def run_room_app():
                 placeholder=placeholder,
             )
             do_post = st.button("Post  ↵", use_container_width=True, type="primary")
+            # Show persistent coin error if set
+            if st.session_state.get("_room_coin_err"):
+                st.warning(st.session_state["_room_coin_err"])
+                if st.button("✕ Dismiss", key="dismiss_coin_err"):
+                    st.session_state.pop("_room_coin_err", None)
+                    st.rerun()
 
             # Fire on Enter OR button click
             _last = st.session_state.get("_last_post", "")
