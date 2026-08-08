@@ -805,25 +805,25 @@ with tab_admin:
     # ── AI Backend Status ─────────────────────────────────────────────────────
     st.markdown("### 🤖 AI Backend Status")
 
-    gemini_key = _get_secret("GEMINI_API_KEY")
-    if gemini_key:
-        st.info("🟢 **Active provider: Gemini** — Ollama is available as fallback")
+    openai_key = _get_secret("OPENAI_API_KEY")
+    if openai_key:
+        st.info("🟢 **Active provider: OpenAI (gpt-4o-mini)** — Ollama is available as fallback")
     else:
-        st.info("🟡 **Active provider: Ollama** — Add GEMINI_API_KEY to secrets.toml to use Gemini")
+        st.info("🟡 **Active provider: Ollama** — Add OPENAI_API_KEY to secrets/env to use OpenAI")
 
     col_ai1, col_ai2 = st.columns(2)
 
     with col_ai1:
-        st.markdown("**Gemini (Google AI)**")
-        if st.button("Check Gemini Connection", type="primary"):
-            if not gemini_key:
-                st.warning("⚠️ No GEMINI_API_KEY found in secrets.toml")
+        st.markdown("**OpenAI (gpt-4o-mini)**")
+        if st.button("Check OpenAI Connection", type="primary"):
+            if not openai_key:
+                st.warning("⚠️ No OPENAI_API_KEY found")
             else:
                 try:
                     ai_chat([{"role": "user", "content": "ping"}])
-                    st.success("✅ Gemini is connected · Active AI provider")
+                    st.success("✅ OpenAI is connected · Active AI provider")
                 except Exception as e:
-                    st.error(f"❌ Gemini error: {e}")
+                    st.error(f"❌ OpenAI error: {e}")
 
     with col_ai2:
         st.markdown("**Ollama (Local Fallback)**")
