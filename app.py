@@ -283,20 +283,23 @@ with st.sidebar:
         st.caption("No gate history yet.")
 
     st.divider()
-    # Single, clean donation widget
     st.markdown(
         """
-        <div style="text-align:center;padding:10px 0 4px;">
-            <div style="font-size:0.78rem;color:#888;letter-spacing:0.08em;margin-bottom:8px;">
-                SUPPORT THE CREATOR
+        <div style="background:#fff8f0;border:1px solid #f5a623;border-radius:8px;
+                    padding:14px 12px;text-align:center;margin:4px 0;">
+            <div style="font-size:0.8rem;font-weight:700;color:#c05c00;margin-bottom:4px;">
+                ☕ Support ThinkTank
+            </div>
+            <div style="font-size:0.72rem;color:#7a5000;margin-bottom:10px;line-height:1.5;">
+                Built by one person. If it helps you think better, consider buying a coffee.
             </div>
             <a href="https://paypal.me/CDovico" target="_blank" rel="noopener"
                style="display:inline-block;background:#003087;color:#fff;
-                      text-decoration:none;font-size:0.8rem;font-weight:600;
-                      padding:8px 20px;border-radius:4px;letter-spacing:0.06em;">
-                &#x2665; Donate via PayPal
+                      text-decoration:none;font-size:0.82rem;font-weight:700;
+                      padding:9px 22px;border-radius:5px;">
+                ♥ Donate via PayPal
             </a>
-            <div style="font-size:0.65rem;color:#555;margin-top:6px;">paypal.me/CDovico</div>
+            <div style="font-size:0.62rem;color:#aaa;margin-top:6px;">Any amount is appreciated</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -340,10 +343,16 @@ if _g_qp.get("purchase") == "success":
             _g_db.coin_credit(_g_sid, _g_coins, f"url-{_g_sid}-{_g_coins}")
     _g_bal = _g_db.coin_get_or_create(_g_sid)
     st.success(f"✅ Payment confirmed! You now have **{_g_bal} coins**. Head to 💬 Ask to use them.")
-    st.query_params.clear()
+    # Keep sid in URL — only clear the purchase params
+    st.query_params["sid"] = _g_sid
+    if "purchase" in st.query_params: del st.query_params["purchase"]
+    if "coins"    in st.query_params: del st.query_params["coins"]
+    if "session"  in st.query_params: del st.query_params["session"]
 elif _g_qp.get("purchase") == "cancelled":
     st.warning("Purchase cancelled — no charge was made.")
-    st.query_params.clear()
+    _g_sid, _ = _get_coin_session()
+    st.query_params["sid"] = _g_sid
+    if "purchase" in st.query_params: del st.query_params["purchase"]
 
 # ── Helper: coin gate used by Ideas, Analysis, Gate tabs ─────────────────────
 def _require_coins(amount: int, action: str):
@@ -844,6 +853,31 @@ with tab_coins:
         st.error(f"Buy Coins error: {_coins_err}")
         import traceback
         st.code(traceback.format_exc())
+
+    # ── Donate nudge at bottom of Buy Coins ───────────────────────────────────
+    st.divider()
+    st.markdown(
+        """
+        <div style="background:#fff8f0;border:1px solid #f5a623;border-radius:8px;
+                    padding:16px 20px;text-align:center;max-width:480px;margin:0 auto;">
+            <div style="font-size:1rem;font-weight:700;color:#c05c00;margin-bottom:6px;">
+                ☕ Love ThinkTank?
+            </div>
+            <div style="font-size:0.85rem;color:#7a5000;margin-bottom:14px;line-height:1.6;">
+                Coins keep the AI running. But if ThinkTank has genuinely helped you think,
+                a small donation means the world.
+            </div>
+            <a href="https://paypal.me/CDovico" target="_blank" rel="noopener"
+               style="display:inline-block;background:#003087;color:#fff;
+                      text-decoration:none;font-size:0.9rem;font-weight:700;
+                      padding:11px 32px;border-radius:6px;">
+                ♥ Donate via PayPal
+            </a>
+            <div style="font-size:0.7rem;color:#aaa;margin-top:8px;">paypal.me/CDovico &nbsp;·&nbsp; Any amount is appreciated</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ==============================================================================
 # ADMIN TAB
