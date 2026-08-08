@@ -27,9 +27,14 @@ def _secret(key: str) -> str:
         return os.environ.get(key, "")
 
 
+def _get_openai_key() -> str:
+    """Get the OpenAI key — checks OPENAI_API_KEY and GEMINI_API_KEY (alias)."""
+    return _secret("OPENAI_API_KEY") or _secret("GEMINI_API_KEY")
+
+
 # ── OpenAI ────────────────────────────────────────────────────────────────────
 def _openai_chat(messages: list[dict]) -> str:
-    api_key = _secret("OPENAI_API_KEY").strip()
+    api_key = _get_openai_key().strip()
     payload = json.dumps({
         "model":      OPENAI_MODEL,
         "messages":   messages,
@@ -70,7 +75,7 @@ def chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str:
     Uses OpenAI → Ollama in priority order.
     Raises OllamaError with a human-readable message on failure.
     """
-    openai_key = _secret("OPENAI_API_KEY")
+    openai_key = _get_openai_key()
     if openai_key:
         try:
             return _openai_chat(messages)
@@ -95,7 +100,7 @@ def chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str:
 
 def is_available(model: str = OLLAMA_MODEL) -> tuple[bool, str]:
     """Return (True, '') if the AI backend is reachable."""
-    openai_key = _secret("OPENAI_API_KEY")
+    openai_key = _get_openai_key()
     if openai_key:
         try:
             _openai_chat([{"role": "user", "content": "ping"}])
