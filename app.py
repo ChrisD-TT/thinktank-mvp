@@ -311,26 +311,41 @@ tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_coins, tab_admin = st.
 )
 
 # ==============================================================================
-# GLOBAL: Stripe return handler — runs on every page load regardless of active tab
+# GLOBAL SESSION — resolved once at top of every page load
+# sid lives in the URL (?sid=...) so it survives refresh and tab switching.
+# session_state is secondary cache only.
 # ==============================================================================
+import uuid as _uuid_mod, importlib as _il_mod
+import thinktank.engine.db as _gdb_mod
+_gdb_mod = _il_mod.reload(_gdb_mod)
+_gdb_mod.init_db()
+
+# 1. URL param is the source of truth
+_url_sid = st.query_params.get("sid", "")
+if _url_sid:
+    # Valid sid in URL — always use it
+    st.session_state.coin_session_id = _url_sid
+elif "coin_session_id" in st.session_state:
+    # No URL sid but session_state has one — write it to URL
+    _url_sid = st.session_state.coin_session_id
+    st.query_params["sid"] = _url_sid
+else:
+    # Brand new visitor — create sid and put it in URL immediately
+    _url_sid = str(_uuid_mod.uuid4())
+    st.session_state.coin_session_id = _url_sid
+    st.query_params["sid"] = _url_sid
+
+# Ensure DB row exists (grants welcome coins exactly once)
+_GLOBAL_SID = _url_sid
+_gdb_mod.coin_get_or_create(_GLOBAL_SID)
+
+
 def _get_coin_session():
-    import uuid as _u2, importlib as _il3
+    """Return (sid, db) — always uses the globally resolved session."""
+    import importlib as _il3
     import thinktank.engine.db as _gdb
     _gdb = _il3.reload(_gdb)
-    _gdb.init_db()
-    # Persist session ID in URL so it survives page refresh
-    _qp_sid = st.query_params.get("sid", "")
-    if _qp_sid:
-        st.session_state.coin_session_id = _qp_sid
-    elif "coin_session_id" not in st.session_state:
-        st.session_state.coin_session_id = str(_u2.uuid4())
-        st.query_params["sid"] = st.session_state.coin_session_id
-    sid = st.session_state.coin_session_id
-    # Always write sid to URL so it persists across refreshes
-    if st.query_params.get("sid", "") != sid:
-        st.query_params["sid"] = sid
-    _gdb.coin_get_or_create(sid)
-    return sid, _gdb
+    return _GLOBAL_SID, _gdb
 
 _g_qp = st.query_params
 if _g_qp.get("purchase") == "success":

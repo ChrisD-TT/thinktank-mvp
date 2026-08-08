@@ -15,17 +15,18 @@ from thinktank.engine.ai import chat as ollama_chat
 
 def _room_coin_op(amount: int, action: str) -> bool:
     """Spend coins for a Room AI action. Returns False if insufficient."""
-    import streamlit as st, os, importlib, uuid
+    import streamlit as st, importlib
     import thinktank.engine.db as _rdb
     _rdb = importlib.reload(_rdb)
+    # Always read sid from URL — source of truth
+    sid = st.query_params.get("sid", "") or st.session_state.get("coin_session_id", "")
+    if not sid:
+        st.session_state["_room_coin_err"] = "🪙 Session not found — please refresh the page."
+        return False
     _rdb.init_db()
-    if "coin_session_id" not in st.session_state:
-        st.session_state.coin_session_id = str(uuid.uuid4())
-    sid = st.session_state.coin_session_id
     _rdb.coin_get_or_create(sid)
     if not _rdb.coin_spend(sid, amount):
         bal = _rdb.coin_balance(sid)
-        # Store in session state so it persists through rerun
         st.session_state["_room_coin_err"] = (
             f"🪙 **Not enough coins** — {action} costs **{amount} coin{'s' if amount > 1 else ''}**. "
             f"You have **{bal} coins**. Go to the 💳 Buy Coins tab to top up."
@@ -38,7 +39,7 @@ def _room_refund(amount: int, reason: str = ""):
     import streamlit as st, importlib
     import thinktank.engine.db as _rdb
     _rdb = importlib.reload(_rdb)
-    sid = st.session_state.get("coin_session_id", "")
+    sid = st.query_params.get("sid", "") or st.session_state.get("coin_session_id", "")
     if sid:
         _rdb.coin_credit(sid, amount, f"refund-room-{sid}-{reason}")
 
