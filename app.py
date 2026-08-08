@@ -837,6 +837,12 @@ with tab_coins:
             {"id": "pro",      "label": "Pro",       "coins": 150, "price": "$19.99", "price_id": _sec("STRIPE_PRICE_PRO")},
         ]
 
+        # hold checkout URL in session_state so it survives Streamlit reruns
+        if "checkout_url" not in st.session_state:
+            st.session_state.checkout_url = None
+        if "checkout_error" not in st.session_state:
+            st.session_state.checkout_error = None
+
         _c1, _c2, _c3 = st.columns(3)
         for _col, _pkg in zip([_c1, _c2, _c3], _PKGS):
             with _col:
@@ -847,18 +853,30 @@ with tab_coins:
                     st.caption("Coins never expire")
                     if st.button(f"Buy {_pkg['label']}", key=f"buy_{_pkg['id']}", type="primary", use_container_width=True):
                         if not _stripe_key:
-                            st.error("Stripe not configured.")
+                            st.session_state.checkout_error = "Stripe not configured."
                         elif not _pkg["price_id"]:
-                            st.error(f"Price ID for {_pkg['label']} not set.")
+                            st.session_state.checkout_error = f"Price ID for {_pkg['label']} not set."
                         else:
                             try:
                                 _co = _stripe_checkout(
                                     _pkg["price_id"], _pkg["coins"], _sid, _stripe_key
                                 )
-                                st.markdown(f"[👉 Click here to complete payment]({_co['url']})")
-                                st.info("After payment, return here and your coins will be credited automatically.")
+                                st.session_state.checkout_url = _co["url"]
+                                st.session_state.checkout_error = None
                             except Exception as _e:
-                                st.error(f"Payment error: {_e}")
+                                st.session_state.checkout_url = None
+                                st.session_state.checkout_error = f"Payment error: {_e}"
+
+        # show checkout button or error OUTSIDE the column loop so it persists after rerun
+        if st.session_state.checkout_error:
+            st.error(st.session_state.checkout_error)
+        if st.session_state.checkout_url:
+            st.success("✅ Checkout ready!")
+            st.link_button("👉 Complete Payment on Stripe", st.session_state.checkout_url, type="primary", use_container_width=True)
+            st.info("After payment, return here — your coins will be credited automatically.")
+            if st.button("✖ Cancel", key="cancel_checkout"):
+                st.session_state.checkout_url = None
+                st.rerun()
 
         st.divider()
         st.metric("Your Coin Balance", f"{_bal} coins")
