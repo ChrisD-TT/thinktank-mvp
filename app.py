@@ -765,11 +765,14 @@ with tab_coins:
 
         def _sec(k):
             import os
+            # Railway env vars always win — prevents secrets.toml from overriding live keys
+            env_val = os.environ.get(k, "")
+            if env_val:
+                return env_val
             try:
-                val = st.secrets.get(k, "") or ""
-                return val if val else os.environ.get(k, "")
+                return st.secrets.get(k, "") or ""
             except Exception:
-                return os.environ.get(k, "")
+                return ""
 
         # ── Session + balance (must come before any use of _bal) ─────────────
         if "coin_session_id" not in st.session_state:
