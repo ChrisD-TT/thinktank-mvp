@@ -775,27 +775,36 @@ with tab_coins:
 
         def _stripe_checkout(price_id, coins, session_id, api_key):
             """Call Stripe Checkout API directly — no SDK, no encoding issues."""
-            # Strip any non-ASCII characters that may have crept in via copy-paste
-            api_key = api_key.encode("ascii", errors="ignore").decode("ascii").strip()
+            import base64, urllib.error as _uerr
+            # Strip any non-ASCII / whitespace characters that may have crept in
+            api_key   = api_key.encode("ascii",   errors="ignore").decode("ascii").strip()
+            price_id  = price_id.encode("ascii",  errors="ignore").decode("ascii").strip()
             base = "https://web-production-69268.up.railway.app"
-            params = _uparse.urlencode({
+            body = _uparse.urlencode({
                 "mode": "payment",
                 "line_items[0][price]": price_id,
                 "line_items[0][quantity]": "1",
                 "success_url": f"{base}?sid={session_id}&purchase=success&coins={coins}&session={session_id}",
-                "cancel_url": f"{base}?sid={session_id}&purchase=cancelled",
+                "cancel_url":  f"{base}?sid={session_id}&purchase=cancelled",
                 "metadata[session_id]": session_id,
                 "metadata[coins]": str(coins),
-            }).encode("utf-8")
-            token = (__import__("base64").b64encode(f"{api_key}:".encode("ascii")).decode("ascii"))
+            })
+            token = base64.b64encode(f"{api_key}:".encode("ascii")).decode("ascii")
             req = _ureq.Request(
                 "https://api.stripe.com/v1/checkout/sessions",
-                data=params,
-                headers={"Authorization": f"Basic {token}"},
+                data=body.encode("ascii"),
+                headers={
+                    "Authorization": f"Basic {token}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
                 method="POST",
             )
-            with _ureq.urlopen(req, timeout=30) as resp:
-                return _json.loads(resp.read().decode("utf-8"))
+            try:
+                with _ureq.urlopen(req, timeout=30) as resp:
+                    return _json.loads(resp.read().decode("utf-8"))
+            except _uerr.HTTPError as http_err:
+                err_body = http_err.read().decode("utf-8", errors="replace")
+                raise RuntimeError(f"Stripe {http_err.code}: {err_body}") from None
 
         # ── Session ID ────────────────────────────────────────────────────────
         # _sid and _bal already set above — just alias for clarity
