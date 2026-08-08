@@ -333,7 +333,7 @@ def dealer_respond(room_id: int, trigger: str) -> str:
             f"Dealer summary — {len(get_idea_posts(room_id))} idea(s) on the table.\n\n"
             f"Reason: AI backend unavailable ({e}).\n"
             f"Action: Showing manual summary.\n"
-            f"Outcome: Make sure Ollama is running (`ollama serve`) then refresh."
+            f"Outcome: Contact the site administrator if this persists."
         )
 
 
@@ -393,16 +393,11 @@ def run_room_app():
     st.markdown("## 🎲 ThinkTank Room")
     st.caption("Collaborative design session — 5 seats + 1 AI dealer")
 
-    # Quick Ollama health check — show a banner if offline
+    # Quick AI health check
     from thinktank.engine.ai import is_available
-    from thinktank import config as cfg
-    _ollama_ok, _ollama_msg = is_available(cfg.OLLAMA_MODEL)
-    if not _ollama_ok:
-        st.error(
-            f"🔌 **Ollama is offline** — AI dealer responses are disabled.  \n"
-            f"Run `ollama serve` in a terminal, then refresh this page.  \n"
-            f"_(Model: `{cfg.OLLAMA_MODEL}`)_"
-        )
+    _ai_ok, _ai_msg = is_available()
+    if not _ai_ok:
+        st.warning(f"⚠️ AI dealer may be unavailable: {_ai_msg}")
 
     # ── Rules expander ────────────────────────────────────────────────────────
     with st.expander("📋  Rules to the ThinkTank Group Messaging Board", expanded=False):
