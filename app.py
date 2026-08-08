@@ -614,14 +614,12 @@ with tab_gate:
 # ASK TAB
 # ==============================================================================
 with tab_ask:
-    # ── Coin balance for public users ─────────────────────────────────────────
+    # ── Use global session ────────────────────────────────────────────────────
     import thinktank.engine.db as _askdb, importlib as _il
     _askdb = _il.reload(_askdb)
-    if "coin_session_id" not in st.session_state:
-        import uuid as _u; st.session_state.coin_session_id = str(_u.uuid4())
-    _ask_sid = st.session_state.coin_session_id
+    _ask_sid = _GLOBAL_SID
     _askdb.init_db()
-    _ask_bal = _askdb.coin_get_or_create(_ask_sid)
+    _ask_bal = _askdb.coin_balance(_ask_sid)
 
     _bal_col, _buy_col = st.columns([3, 1])
     with _bal_col:
@@ -687,13 +685,15 @@ with tab_ask:
     st.divider()
 
     messages = chat_get_messages(chat_id, limit=30) if chat_id else []
-    if messages:
-        for msg in messages:
-            with st.chat_message(msg["role"]):
-                _render_chat_message(msg["content"])
-                st.caption(_fmt_ts(msg["created_at"]))
-    else:
-        st.caption("No messages yet — ask something below.")
+    _chat_box = st.container(height=480, border=False)
+    with _chat_box:
+        if messages:
+            for msg in messages:
+                with st.chat_message(msg["role"]):
+                    _render_chat_message(msg["content"])
+                    st.caption(_fmt_ts(msg["created_at"]))
+        else:
+            st.caption("No messages yet — ask something below.")
 
     ask_text = st.text_area("Ask something", height=120, key="ask_input",
                             placeholder="Ask ThinkTank anything…")
@@ -782,8 +782,8 @@ with tab_coins:
                 "mode": "payment",
                 "line_items[0][price]": price_id,
                 "line_items[0][quantity]": "1",
-                "success_url": f"{base}?purchase=success&coins={coins}&session={session_id}",
-                "cancel_url": f"{base}?purchase=cancelled",
+                "success_url": f"{base}?sid={session_id}&purchase=success&coins={coins}&session={session_id}",
+                "cancel_url": f"{base}?sid={session_id}&purchase=cancelled",
                 "metadata[session_id]": session_id,
                 "metadata[coins]": str(coins),
             }).encode("utf-8")
