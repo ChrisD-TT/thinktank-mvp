@@ -673,6 +673,9 @@ with tab_coins:
 
         st.subheader("💳 Buy Coins")
         st.caption("Coins power your ThinkTank AI sessions. Buy once, use anytime — coins never expire.")
+        if _bal == 5 and not st.session_state.get("welcome_shown"):
+            st.success("🎁 Welcome! You've been given **5 free coins** to try ThinkTank. Head to the 💬 Ask tab to use them.")
+            st.session_state.welcome_shown = True
 
         def _sec(k):
             import os
@@ -790,6 +793,30 @@ with tab_coins:
 # ADMIN TAB
 # ==============================================================================
 with tab_admin:
+    # ── Password gate ─────────────────────────────────────────────────────────
+    def _get_admin_secret(k):
+        import os
+        try:
+            v = st.secrets.get(k, "") or ""
+            return v if v else os.environ.get(k, "")
+        except Exception:
+            return os.environ.get(k, "")
+
+    _admin_pw = _get_admin_secret("ADMIN_PASSWORD") or "thinktank-admin"
+    if "admin_unlocked" not in st.session_state:
+        st.session_state.admin_unlocked = False
+
+    if not st.session_state.admin_unlocked:
+        st.subheader("⚙️ Admin / Settings")
+        _pw_input = st.text_input("Enter admin password", type="password", key="admin_pw_input")
+        if st.button("Unlock", type="primary"):
+            if _pw_input == _admin_pw:
+                st.session_state.admin_unlocked = True
+                st.rerun()
+            else:
+                st.error("Incorrect password.")
+        st.stop()
+
     st.subheader("⚙️ Admin / Settings")
 
     from thinktank.engine.ai import is_available, chat as ai_chat
