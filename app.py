@@ -2107,7 +2107,7 @@ These Terms are governed by the laws of the United States.
 
 ### 13. Contact
 
-**support@thinktankapp.net** · www.thinktankapp.net
+**chris@thinktankapp.net** · www.thinktankapp.net
         """)
 
     with _legal_pp:
@@ -2174,7 +2174,7 @@ Payment data is handled solely by [Stripe](https://stripe.com/privacy).
 ### 5. Data Retention
 
 Your data is retained while your account is active.
-To delete your account and all associated data, email **support@thinktankapp.net**.
+To delete your account and all associated data, email **chris@thinktankapp.net**.
 
 ---
 
@@ -2182,7 +2182,7 @@ To delete your account and all associated data, email **support@thinktankapp.net
 
 You may request to access, correct, or delete your personal data at any time.
 You can export your generated content using the Download button in Content Studio.
-Contact us at **support@thinktankapp.net** to exercise these rights.
+Contact us at **chris@thinktankapp.net** to exercise these rights.
 
 ---
 
@@ -2209,5 +2209,5 @@ the most recent revision.
 
 ### 10. Contact
 
-**support@thinktankapp.net** · www.thinktankapp.net
+**chris@thinktankapp.net** · www.thinktankapp.net
         """)
