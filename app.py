@@ -417,9 +417,8 @@ tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab
 # sid lives in the URL (?sid=...) so it survives refresh and tab switching.
 # session_state is secondary cache only.
 # ==============================================================================
-import uuid as _uuid_mod, importlib as _il_mod
+import uuid as _uuid_mod
 import thinktank.engine.db as _gdb_mod
-_gdb_mod = _il_mod.reload(_gdb_mod)
 _gdb_mod.init_db()
 
 # 1. URL param is the source of truth
@@ -444,9 +443,7 @@ _gdb_mod.coin_get_or_create(_GLOBAL_SID)
 
 def _get_coin_session():
     """Return (sid, db) — always uses the globally resolved session."""
-    import importlib as _il3
     import thinktank.engine.db as _gdb
-    _gdb = _il3.reload(_gdb)
     return _GLOBAL_SID, _gdb
 
 _g_qp = st.query_params
@@ -455,9 +452,9 @@ if _g_qp.get("purchase") == "success":
     _g_coins   = int(_g_qp.get("coins", "0"))
     _g_ret_sid = _g_qp.get("session", _g_sid)
     if _g_coins > 0:
-        _g_db.coin_credit(_g_ret_sid, _g_coins, f"url-{_g_ret_sid}-{_g_coins}")
-        if _g_ret_sid != _g_sid:
-            _g_db.coin_credit(_g_sid, _g_coins, f"url-{_g_sid}-{_g_coins}")
+        # credit once to the session tied to the purchase (idempotent — safe to replay)
+        _effective_sid = _g_ret_sid if _g_ret_sid else _g_sid
+        _g_db.coin_credit(_effective_sid, _g_coins, f"url-{_effective_sid}-{_g_coins}")
     _g_bal = _g_db.coin_get_or_create(_g_sid)
     st.success(f"✅ Payment confirmed! You now have **{_g_bal} coins**. Head to 💬 Ask to use them.")
     # Keep sid in URL — only clear the purchase params
@@ -717,10 +714,8 @@ with tab_gate:
 # ==============================================================================
 with tab_ask:
     # ── Use global session ────────────────────────────────────────────────────
-    import thinktank.engine.db as _askdb, importlib as _il
-    _askdb = _il.reload(_askdb)
+    import thinktank.engine.db as _askdb
     _ask_sid = _GLOBAL_SID
-    _askdb.init_db()
     _ask_bal = _askdb.coin_balance(_ask_sid)
 
     _bal_col, _buy_col = st.columns([3, 1])
@@ -864,9 +859,7 @@ with tab_studio:
     _TONES     = ["Professional", "Casual", "Viral", "Informative", "Bold"]
 
     _studio_sid = _auth_sid()
-    import importlib as _sil, thinktank.engine.db as _sdb
-    _sdb = _sil.reload(_sdb)
-    _sdb.init_db()
+    import thinktank.engine.db as _sdb
     _studio_bal = _sdb.coin_balance(_studio_sid)
     # check if user has free edits based on plan tier
     from thinktank.engine.db import user_get_plan, FREE_EDIT_TIERS
@@ -1113,8 +1106,7 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
     st.caption("Everything you've generated is saved to your account. Download it all as a text file anytime.")
 
     if st.session_state.auth_user:
-        import importlib as _dl_il, thinktank.engine.db as _dldb
-        _dldb = _dl_il.reload(_dldb)
+        import thinktank.engine.db as _dldb
         _all_power = [r for r in _dldb.studio_list(_studio_sid)
                       if r["content_type"] in ("hook_generator", "repurpose_engine", "brand_voice_builder")]
         _all_studio = [r for r in _dldb.studio_list(_studio_sid)
@@ -1549,9 +1541,7 @@ with tab_coins:
             import uuid as _uuid2
             st.session_state.coin_session_id = str(_uuid2.uuid4())
         _sid_early = _auth_sid() if st.session_state.auth_user else st.session_state.coin_session_id
-        import importlib as _il2, thinktank.engine.db as _earlydb
-        _earlydb = _il2.reload(_earlydb)
-        _earlydb.init_db()
+        import thinktank.engine.db as _earlydb
         _bal = _earlydb.coin_get_or_create(_sid_early)
 
         st.subheader("💳 Buy Coins")
@@ -1915,9 +1905,7 @@ with tab_admin:
             if not _grant_email.strip():
                 st.error("Enter an email.")
             else:
-                import importlib as _gcil, thinktank.engine.db as _gcdb
-                _gcdb = _gcil.reload(_gcdb)
-                _gcdb.init_db()
+                import thinktank.engine.db as _gcdb
                 _gcdb.coin_get_or_create(_grant_email.strip().lower())
                 _gcdb.coin_credit(_grant_email.strip().lower(), int(_grant_amount),
                                   f"admin-grant-{_grant_email.strip().lower()}-{_grant_amount}")
