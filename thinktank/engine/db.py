@@ -48,10 +48,13 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 CREATE TABLE IF NOT EXISTS users (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    email        TEXT    NOT NULL UNIQUE,
-    password_hash TEXT   NOT NULL,
-    created_at   TEXT    NOT NULL
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,
+    plan_tier     TEXT    NOT NULL DEFAULT 'free',
+    promo_code    TEXT,
+    promo_used    INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS coin_users (
@@ -261,6 +264,68 @@ def chat_delete(chat_id: int) -> bool:
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
+
+# ── Plan tiers ────────────────────────────────────────────────────────────────
+# Tiers that get FREE edits (no coin charge)
+FREE_EDIT_TIERS = {"studio_2week", "studio_max"}
+# Tiers that get a promo code on purchase
+PROMO_CODE_TIERS = {"studio_2week", "studio_max"}
+
+
+def _gen_promo_code(email: str) -> str:
+    """Generate a unique 35%-off promo code for this user."""
+    import secrets
+    suffix = secrets.token_hex(4).upper()
+    prefix = email.split("@")[0][:6].upper().replace(".", "")
+    return f"TT35-{prefix}-{suffix}"
+
+
+def user_get_plan(email: str) -> dict:
+    """Return plan_tier and promo_code for a user."""
+    email = email.strip().lower()
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT plan_tier, promo_code, promo_used FROM users WHERE email=?", (email,)
+        ).fetchone()
+    if not row:
+        return {"plan_tier": "free", "promo_code": None, "promo_used": False}
+    return {"plan_tier": row[0], "promo_code": row[1], "promo_used": bool(row[2])}
+
+
+def user_set_plan(email: str, tier: str) -> str | None:
+    """Upgrade user to a plan tier. Returns promo code if applicable."""
+    email = email.strip().lower()
+    promo = None
+    if tier in PROMO_CODE_TIERS:
+        promo = _gen_promo_code(email)
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "UPDATE users SET plan_tier=?, promo_code=? WHERE email=?",
+            (tier, promo, email),
+        )
+    return promo
+
+
+def promo_validate(code: str) -> dict:
+    """Check if a promo code is valid and unused. Returns discount info."""
+    code = code.strip().upper()
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT email, promo_used FROM users WHERE promo_code=?", (code,)
+        ).fetchone()
+    if not row:
+        return {"valid": False, "error": "Invalid promo code."}
+    if row[1]:
+        return {"valid": False, "error": "This promo code has already been used."}
+    return {"valid": True, "discount": 0.35, "email": row[0]}
+
+
+def promo_apply(code: str) -> None:
+    """Mark a promo code as used."""
+    code = code.strip().upper()
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute("UPDATE users SET promo_used=1 WHERE promo_code=?", (code,))
+
 
 def _hash_pw(password: str) -> str:
     return hashlib.sha256(password.strip().encode("utf-8")).hexdigest()

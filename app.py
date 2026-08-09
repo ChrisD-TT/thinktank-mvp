@@ -832,6 +832,10 @@ with tab_studio:
     _sdb = _sil.reload(_sdb)
     _sdb.init_db()
     _studio_bal = _sdb.coin_balance(_studio_sid)
+    # check if user has free edits based on plan tier
+    from thinktank.engine.db import user_get_plan, FREE_EDIT_TIERS
+    _user_plan = user_get_plan(st.session_state.auth_user) if st.session_state.auth_user else {"plan_tier": "free"}
+    _free_edits = _user_plan["plan_tier"] in FREE_EDIT_TIERS
 
     st.subheader("📱 Content Studio")
     st.caption("AI-generated social media content. Coins are charged per generation.")
@@ -992,13 +996,15 @@ Return only the post content, ready to publish."""
                         _edited = st.text_area("Content", value=_c["content"], key=_edit_key, height=120)
                         _ecol1, _ecol2 = st.columns(2)
                         with _ecol1:
-                            if st.button(f"💾 Save Edit (3 coins)", key=f"save_{_c['id']}"):
-                                if _studio_bal < 3:
-                                    st.error("Not enough coins to save edit.")
-                                elif _edited.strip() == _c["content"].strip():
+                            _edit_label = "💾 Save Edit (FREE)" if _free_edits else "💾 Save Edit (3 coins)"
+                            if st.button(_edit_label, key=f"save_{_c['id']}"):
+                                if _edited.strip() == _c["content"].strip():
                                     st.warning("No changes detected.")
+                                elif not _free_edits and _studio_bal < 3:
+                                    st.error("Not enough coins to save edit. Go to 💳 Buy Coins to top up.")
                                 else:
-                                    _sdb.coin_spend(_studio_sid, 3)
+                                    if not _free_edits:
+                                        _sdb.coin_spend(_studio_sid, 3)
                                     studio_update(_c["id"], _edited.strip())
                                     st.success("✅ Saved!")
                                     st.rerun()
@@ -1083,16 +1089,18 @@ with tab_coins:
         _sid    = _sid_early
         _coindb = _earlydb
 
-        # ── Packages (shown first so they're visible without scrolling) ───────
+        # ── Packages ──────────────────────────────────────────────────────────
         _PKGS = [
-            # ── Standard packs ────────────────────────────────────────────────
-            {"id": "starter",        "label": "Starter",         "coins": 25,  "price": "$4.99",  "price_id": _sec("STRIPE_PRICE_STARTER"),        "desc": "Try ThinkTank AI tools"},
-            {"id": "standard",       "label": "Standard",        "coins": 60,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STANDARD"),       "desc": "Heavy AI usage + content posts"},
-            {"id": "pro",            "label": "Pro",              "coins": 150, "price": "$19.99", "price_id": _sec("STRIPE_PRICE_PRO"),            "desc": "Full AI + 2 weeks of content"},
-            # ── Content Studio bundles ────────────────────────────────────────
-            {"id": "studio_starter", "label": "Studio Starter",  "coins": 75,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER"), "desc": "📱 1 full week on 1 platform"},
-            {"id": "studio_pro",     "label": "Studio Pro",      "coins": 200, "price": "$24.99", "price_id": _sec("STRIPE_PRICE_STUDIO_PRO"),     "desc": "📱 2 full weeks, multiple platforms"},
-            {"id": "studio_max",     "label": "Studio Max",      "coins": 900, "price": "$99.99", "price_id": _sec("STRIPE_PRICE_STUDIO_MAX"),     "desc": "📱 Full week ALL platforms + edits"},
+            # ── ThinkTank AI Packs ────────────────────────────────────────────
+            {"id": "starter",         "label": "Starter",          "coins": 25,  "price": "$4.99",  "tier": None,            "price_id": _sec("STRIPE_PRICE_STARTER"),         "desc": "Try all ThinkTank AI tools"},
+            {"id": "standard",        "label": "Standard",         "coins": 60,  "price": "$9.99",  "tier": None,            "price_id": _sec("STRIPE_PRICE_STANDARD"),        "desc": "Heavy AI usage + content posts"},
+            {"id": "pro",             "label": "Pro",               "coins": 150, "price": "$19.99", "tier": None,            "price_id": _sec("STRIPE_PRICE_PRO"),             "desc": "Full AI suite + 2 weeks of content"},
+            # ── Content Studio Plans ──────────────────────────────────────────
+            {"id": "studio_starter",  "label": "Studio Starter",   "coins": 20,  "price": "$15",    "tier": "studio_starter","price_id": _sec("STRIPE_PRICE_STUDIO_STARTER"),  "desc": "📱 Posts · Hashtags · TikTok scripts · 15% multi-platform"},
+            {"id": "studio_pro",      "label": "Studio Pro",        "coins": 85,  "price": "$65",    "tier": "studio_pro",    "price_id": _sec("STRIPE_PRICE_STUDIO_PRO"),      "desc": "📱 All Starter features + 3-coin edits"},
+            {"id": "studio_week1",    "label": "Studio Week 1",     "coins": 110, "price": "$200",   "tier": "studio_week1",  "price_id": _sec("STRIPE_PRICE_STUDIO_WEEK1"),    "desc": "📱 Up to 3 platforms · Full week · Daily email 12:01 AM · 3-coin edits"},
+            {"id": "studio_2week",    "label": "Studio 2-Week",     "coins": 250, "price": "$425",   "tier": "studio_2week",  "price_id": _sec("STRIPE_PRICE_STUDIO_2WEEK"),    "desc": "📱 All 5 platforms · 2 weeks · FREE edits · Daily email · 35% promo code"},
+            {"id": "studio_max",      "label": "Studio Max",        "coins": 700, "price": "$700",   "tier": "studio_max",    "price_id": _sec("STRIPE_PRICE_STUDIO_MAX"),      "desc": "📱 Unlimited Studio · Permanent FREE edits · 700 coins · 35% promo code"},
         ]
 
         # hold checkout URL in session_state so it survives Streamlit reruns
@@ -1101,7 +1109,31 @@ with tab_coins:
         if "checkout_error" not in st.session_state:
             st.session_state.checkout_error = None
 
-        # ── Standard packs row ────────────────────────────────────────────────
+        # ── helper: buy button logic ──────────────────────────────────────────
+        from thinktank.engine.db import user_set_plan, user_get_plan, FREE_EDIT_TIERS
+
+        def _do_buy(pkg):
+            if not st.session_state.auth_user:
+                st.session_state.checkout_error = None
+                st.session_state.checkout_url   = None
+                st.session_state["show_login_gate"] = True
+            elif not _stripe_key:
+                st.session_state.checkout_error = "Stripe not configured."
+            elif not pkg["price_id"]:
+                st.session_state.checkout_error = f"Price ID for {pkg['label']} not set — add to Railway variables."
+            else:
+                st.session_state["show_login_gate"] = False
+                try:
+                    _co = _stripe_checkout(pkg["price_id"], pkg["coins"], _sid, _stripe_key)
+                    st.session_state.checkout_url   = _co["url"]
+                    st.session_state.checkout_error = None
+                    # upgrade plan tier on click (confirmed on return)
+                    st.session_state["pending_tier"] = pkg.get("tier")
+                except Exception as _e:
+                    st.session_state.checkout_url   = None
+                    st.session_state.checkout_error = f"Payment error: {_e}"
+
+        # ── ThinkTank AI Packs ────────────────────────────────────────────────
         st.markdown("#### 🧠 ThinkTank AI Packs")
         _c1, _c2, _c3 = st.columns(3)
         for _col, _pkg in zip([_c1, _c2, _c3], _PKGS[:3]):
@@ -1110,58 +1142,35 @@ with tab_coins:
                     st.markdown(f"### {_pkg['label']}")
                     st.markdown(f"**{_pkg['coins']} coins**")
                     st.markdown(f"**{_pkg['price']}** one-time")
-                    st.caption(_pkg.get("desc", "Coins never expire"))
+                    st.caption(_pkg.get("desc", ""))
                     if st.button(f"Buy {_pkg['label']}", key=f"buy_{_pkg['id']}", type="primary", use_container_width=True):
-                        if not st.session_state.auth_user:
-                            # not logged in — gate the purchase
-                            st.session_state.checkout_error = None
-                            st.session_state.checkout_url = None
-                            st.session_state["show_login_gate"] = True
-                        elif not _stripe_key:
-                            st.session_state.checkout_error = "Stripe not configured."
-                        elif not _pkg["price_id"]:
-                            st.session_state.checkout_error = f"Price ID for {_pkg['label']} not set."
-                        else:
-                            st.session_state["show_login_gate"] = False
-                            try:
-                                _co = _stripe_checkout(
-                                    _pkg["price_id"], _pkg["coins"], _sid, _stripe_key
-                                )
-                                st.session_state.checkout_url = _co["url"]
-                                st.session_state.checkout_error = None
-                            except Exception as _e:
-                                st.session_state.checkout_url = None
-                                st.session_state.checkout_error = f"Payment error: {_e}"
+                        _do_buy(_pkg)
 
-        # ── Content Studio packs row ──────────────────────────────────────────
-        st.markdown("#### 📱 Content Studio Packs")
-        st.caption("Buy coins in bulk for Content Studio — one checkout covers your full week.")
-        _s1, _s2, _s3 = st.columns(3)
-        for _scol, _spkg in zip([_s1, _s2, _s3], _PKGS[3:]):
+        # ── Content Studio Plans ──────────────────────────────────────────────
+        st.divider()
+        st.markdown("#### 📱 Content Studio Plans")
+        st.caption("One checkout — no repeat purchases. Coins load instantly after payment.")
+        # row 1: Studio Starter + Studio Pro
+        _sr1, _sr2 = st.columns(2)
+        for _scol, _spkg in zip([_sr1, _sr2], _PKGS[3:5]):
             with _scol:
                 with st.container(border=True):
                     st.markdown(f"### {_spkg['label']}")
-                    st.markdown(f"**{_spkg['coins']} coins**")
-                    st.markdown(f"**{_spkg['price']}** one-time")
+                    st.markdown(f"**{_spkg['coins']} coins · {_spkg['price']}**")
                     st.caption(_spkg.get("desc", ""))
                     if st.button(f"Buy {_spkg['label']}", key=f"buy_{_spkg['id']}", type="primary", use_container_width=True):
-                        if not st.session_state.auth_user:
-                            st.session_state.checkout_error = None
-                            st.session_state.checkout_url = None
-                            st.session_state["show_login_gate"] = True
-                        elif not _stripe_key:
-                            st.session_state.checkout_error = "Stripe not configured."
-                        elif not _spkg["price_id"]:
-                            st.session_state.checkout_error = f"Price ID for {_spkg['label']} not set in Railway variables."
-                        else:
-                            st.session_state["show_login_gate"] = False
-                            try:
-                                _co = _stripe_checkout(_spkg["price_id"], _spkg["coins"], _sid, _stripe_key)
-                                st.session_state.checkout_url = _co["url"]
-                                st.session_state.checkout_error = None
-                            except Exception as _e:
-                                st.session_state.checkout_url = None
-                                st.session_state.checkout_error = f"Payment error: {_e}"
+                        _do_buy(_spkg)
+        # row 2: Week 1 + 2-Week + Max (full width cards)
+        for _spkg in _PKGS[5:]:
+            with st.container(border=True):
+                _pa, _pb = st.columns([3,1])
+                with _pa:
+                    st.markdown(f"### {_spkg['label']} — {_spkg['price']}")
+                    st.caption(_spkg.get("desc", ""))
+                    st.markdown(f"**{_spkg['coins']} coins included**")
+                with _pb:
+                    if st.button(f"Buy {_spkg['label']}", key=f"buy_{_spkg['id']}", type="primary", use_container_width=True):
+                        _do_buy(_spkg)
 
         # show login gate if not logged in
         if st.session_state.get("show_login_gate"):
@@ -1216,27 +1225,53 @@ with tab_coins:
             _return_coins = int(_qp.get("coins", "0"))
             _return_sid   = _qp.get("session", _sid)
             if _return_coins > 0:
-                # Credit coins directly from URL params as a reliable fallback
-                _coindb.coin_credit(
-                    _return_sid,
-                    _return_coins,
-                    f"url-credit-{_return_sid}-{_return_coins}"
-                )
-                # Also credit to current session if different (browser reopened)
+                _coindb.coin_credit(_return_sid, _return_coins, f"url-credit-{_return_sid}-{_return_coins}")
                 if _return_sid != _sid:
-                    _coindb.coin_credit(
-                        _sid,
-                        _return_coins,
-                        f"url-credit-{_sid}-{_return_coins}"
-                    )
+                    _coindb.coin_credit(_sid, _return_coins, f"url-credit-{_sid}-{_return_coins}")
+            # upgrade plan tier if a studio plan was purchased
+            _pending_tier = st.session_state.pop("pending_tier", None)
+            _promo_earned = None
+            if _pending_tier and st.session_state.auth_user:
+                _promo_earned = user_set_plan(st.session_state.auth_user, _pending_tier)
             _bal_now = _coindb.coin_get_or_create(_sid)
             st.success(f"✅ Payment confirmed! **{_bal_now} coins** are ready to use.")
+            if _promo_earned:
+                st.balloons()
+                st.info(f"🎉 Your exclusive 35% off promo code: **`{_promo_earned}`** — use it on your next purchase. Save it now!")
             if st.button("🔄 Continue"):
                 st.query_params.clear()
                 st.rerun()
         elif _qp.get("purchase") == "cancelled":
             st.warning("Purchase cancelled. No charge was made.")
             st.query_params.clear()
+
+        # ── Promo code redemption ──────────────────────────────────────────────
+        st.divider()
+        st.markdown("#### 🎟 Have a Promo Code?")
+        from thinktank.engine.db import promo_validate, promo_apply
+        _promo_input = st.text_input("Enter promo code", placeholder="TT35-XXXXX-XXXX", key="promo_input")
+        if st.button("Apply Code", key="apply_promo"):
+            if not st.session_state.auth_user:
+                st.error("Log in first to apply a promo code.")
+            elif not _promo_input.strip():
+                st.error("Please enter a promo code.")
+            else:
+                _pv = promo_validate(_promo_input.strip())
+                if not _pv["valid"]:
+                    st.error(_pv["error"])
+                else:
+                    promo_apply(_promo_input.strip())
+                    st.session_state["promo_discount"] = 0.35
+                    st.success("✅ Promo code applied! You'll get 35% off your next purchase. Select a pack above to buy.")
+
+        # ── Show current plan + promo if logged in ────────────────────────────
+        if st.session_state.auth_user:
+            _up = user_get_plan(st.session_state.auth_user)
+            if _up["plan_tier"] != "free":
+                st.divider()
+                st.markdown(f"**Your Plan:** `{_up['plan_tier'].replace('_',' ').title()}`")
+            if _up["promo_code"] and not _up["promo_used"]:
+                st.info(f"🎟 Your promo code: **`{_up['promo_code']}`** (35% off next purchase — unused)")
 
     except Exception as _coins_err:
         st.error(f"Buy Coins error: {_coins_err}")
