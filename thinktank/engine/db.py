@@ -92,6 +92,8 @@ def _utc() -> str:
 
 
 def init_db() -> None:
+    import os
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     with sqlite3.connect(DB_PATH) as con:
         con.executescript(_SCHEMA)
 
