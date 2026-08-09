@@ -429,19 +429,58 @@ def studio_save(session_id: str, platform: str, topic: str, tone: str,
         return int(cur.lastrowid)
 
 
-def studio_release_due(session_id: str) -> None:
-    """Mark content as released if its scheduled_for date has passed."""
+def studio_release_due(session_id: str, user_email: str = None) -> None:
+    """Mark content as released if its scheduled_for date has passed, then email user."""
     today = datetime.now(timezone.utc).date().isoformat()
     with sqlite3.connect(DB_PATH) as con:
-        con.execute(
-            "UPDATE studio_content SET released=1 WHERE session_id=? AND released=0 AND scheduled_for<=?",
+        # find items that are newly due
+        due = con.execute(
+            """SELECT id, platform, content FROM studio_content
+               WHERE session_id=? AND released=0 AND scheduled_for<=?""",
             (session_id, today),
-        )
+        ).fetchall()
+        if due:
+            con.execute(
+                "UPDATE studio_content SET released=1 WHERE session_id=? AND released=0 AND scheduled_for<=?",
+                (session_id, today),
+            )
+            if user_email:
+                _send_daily_content_email(user_email, due)
 
 
-def studio_list(session_id: str) -> list[dict]:
+def _send_daily_content_email(to_email: str, items: list) -> None:
+    """Send today's unlocked content to the user via email."""
+    import smtplib, os
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_pass = os.environ.get("SMTP_PASS", "")
+    if not smtp_user or not smtp_pass:
+        return  # email not configured — skip silently
+    body_parts = ["<h2>🧠 ThinkTank Content Studio — Today's Posts</h2>"]
+    for item in items:
+        body_parts.append(f"<h3>📱 {item[1]}</h3><pre style='white-space:pre-wrap'>{item[2]}</pre><hr>")
+    body_parts.append("<p><a href='https://www.thinktankapp.net'>Open ThinkTank</a></p>")
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "📱 Your ThinkTank content is ready for today"
+    msg["From"]    = smtp_user
+    msg["To"]      = to_email
+    msg.attach(MIMEText("\n".join([i[2] for i in items]), "plain"))
+    msg.attach(MIMEText("".join(body_parts), "html"))
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as s:
+            s.starttls()
+            s.login(smtp_user, smtp_pass)
+            s.sendmail(smtp_user, to_email, msg.as_string())
+    except Exception:
+        pass  # fail silently — content still unlocks in the app
+
+
+def studio_list(session_id: str, user_email: str = None) -> list[dict]:
     """Return all content for a session, releasing any due items first."""
-    studio_release_due(session_id)
+    studio_release_due(session_id, user_email)
     with sqlite3.connect(DB_PATH) as con:
         rows = con.execute(
             """SELECT id, platform, topic, tone, content, content_type,

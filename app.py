@@ -816,12 +816,13 @@ with tab_studio:
     # ── Coin costs ────────────────────────────────────────────────────────────
     _STUDIO_COSTS = {
         "single":       7,   # single platform post
-        "post_hook":    4,   # post + hashtags + hook (per platform)
-        "tiktok":       7,   # TikTok/Reel script
+        "post_hook":    12,  # post + hashtags + hook (per platform)
+        "tiktok":       18,  # TikTok/Reel script
         "week_one":     70,  # full week 1 platform
         "week_all":     850, # full week all platforms
-        "edit":         2,   # edit existing content
+        "edit":         3,   # edit existing content
     }
+    _MULTI_DISC = 0.85  # 15% off when selecting multiple platforms
 
     _PLATFORMS = ["Twitter/X", "LinkedIn", "TikTok", "Instagram", "Reddit"]
     _TONES     = ["Professional", "Casual", "Viral", "Informative", "Bold"]
@@ -847,8 +848,8 @@ with tab_studio:
 
     _gen_type = st.selectbox("Content Type", [
         "Single Post (7 coins)",
-        "Post + Hashtags + Hook (4 coins each platform)",
-        "TikTok / Reel Script (7 coins)",
+        "Post + Hashtags + Hook (12 coins per platform)",
+        "TikTok / Reel Script (18 coins)",
         "Full Week — 1 Platform (70 coins)",
         "Full Week — ALL Platforms (850 coins)",
     ], key="studio_gen_type")
@@ -863,22 +864,23 @@ with tab_studio:
         _sel_platforms = st.multiselect(
             "Platform(s)", _PLATFORMS, default=["Twitter/X"], key="studio_platforms"
         )
-        # multi-platform multiplier
+        # multi-platform 15% discount
         if len(_sel_platforms) > 1 and "Full Week" not in _gen_type:
             _base = _STUDIO_COSTS["post_hook"] if "Hashtags" in _gen_type else _STUDIO_COSTS["single"]
             _full_price = _base * len(_sel_platforms)
-            _disc_price = max(1, round(_full_price * 0.75))
-            st.success(f"🎁 Multi-platform discount! {len(_sel_platforms)} platforms × {_base} coins = ~~{_full_price}~~ **{_disc_price} coins** (25% off)")
+            _disc_price = max(1, round(_full_price * _MULTI_DISC))
+            _saved = _full_price - _disc_price
+            st.success(f"🎁 Multi-platform discount! {len(_sel_platforms)} platforms × {_base} coins = ~~{_full_price}~~ **{_disc_price} coins** (15% off — you save {_saved} coins)")
 
     _topic = st.text_area("Topic / Brief", placeholder="e.g. Launching ThinkTank — AI decision engine for entrepreneurs", key="studio_topic", height=80)
     _tone  = st.selectbox("Tone", _TONES, key="studio_tone")
 
-    # week schedule toggle
+    # week schedule toggle + email
     _schedule_week = False
     if "Full Week" in _gen_type:
         _schedule_week = st.toggle("📅 Schedule daily release (Mon–Sun unlocks day by day)", value=True, key="studio_schedule")
         if _schedule_week:
-            st.info("Content will unlock one day at a time. Visit daily to see your next post.")
+            st.info("✉️ Each day's content will unlock at 12:01 AM and be emailed to you automatically — ready every morning.")
 
     # calculate coin cost
     def _studio_cost(gen_type, platforms):
@@ -887,10 +889,10 @@ with tab_studio:
         if "TikTok" in gen_type:           return _STUDIO_COSTS["tiktok"]
         if "Hashtags" in gen_type:
             base = _STUDIO_COSTS["post_hook"] * len(platforms)
-            if len(platforms) > 1: base = max(1, round(base * 0.75))
+            if len(platforms) > 1: base = max(1, round(base * _MULTI_DISC))
             return base
         base = _STUDIO_COSTS["single"] * len(platforms)
-        if len(platforms) > 1: base = max(1, round(base * 0.75))
+        if len(platforms) > 1: base = max(1, round(base * _MULTI_DISC))
         return base
 
     _cost = _studio_cost(_gen_type, _sel_platforms if "ALL Platforms" not in _gen_type else _PLATFORMS)
@@ -958,7 +960,7 @@ Return only the post content, ready to publish."""
 
     # ── Content Schedule (Mon–Sun viewer) ─────────────────────────────────────
     st.markdown("### 📅 Your Content Schedule")
-    _all_content = studio_list(_studio_sid)
+    _all_content = studio_list(_studio_sid, user_email=st.session_state.auth_user)
 
     if not _all_content:
         st.caption("No content generated yet. Use the generator above to create your first post.")
@@ -990,13 +992,13 @@ Return only the post content, ready to publish."""
                         _edited = st.text_area("Content", value=_c["content"], key=_edit_key, height=120)
                         _ecol1, _ecol2 = st.columns(2)
                         with _ecol1:
-                            if st.button(f"💾 Save Edit (2 coins)", key=f"save_{_c['id']}"):
-                                if _studio_bal < 2:
+                            if st.button(f"💾 Save Edit (3 coins)", key=f"save_{_c['id']}"):
+                                if _studio_bal < 3:
                                     st.error("Not enough coins to save edit.")
                                 elif _edited.strip() == _c["content"].strip():
                                     st.warning("No changes detected.")
                                 else:
-                                    _sdb.coin_spend(_studio_sid, 2)
+                                    _sdb.coin_spend(_studio_sid, 3)
                                     studio_update(_c["id"], _edited.strip())
                                     st.success("✅ Saved!")
                                     st.rerun()
@@ -1083,9 +1085,14 @@ with tab_coins:
 
         # ── Packages (shown first so they're visible without scrolling) ───────
         _PKGS = [
-            {"id": "starter",  "label": "Starter",  "coins": 25,  "price": "$4.99",  "price_id": _sec("STRIPE_PRICE_STARTER")},
-            {"id": "standard", "label": "Standard", "coins": 60,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STANDARD")},
-            {"id": "pro",      "label": "Pro",       "coins": 150, "price": "$19.99", "price_id": _sec("STRIPE_PRICE_PRO")},
+            # ── Standard packs ────────────────────────────────────────────────
+            {"id": "starter",        "label": "Starter",         "coins": 25,  "price": "$4.99",  "price_id": _sec("STRIPE_PRICE_STARTER"),        "desc": "Try ThinkTank AI tools"},
+            {"id": "standard",       "label": "Standard",        "coins": 60,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STANDARD"),       "desc": "Heavy AI usage + content posts"},
+            {"id": "pro",            "label": "Pro",              "coins": 150, "price": "$19.99", "price_id": _sec("STRIPE_PRICE_PRO"),            "desc": "Full AI + 2 weeks of content"},
+            # ── Content Studio bundles ────────────────────────────────────────
+            {"id": "studio_starter", "label": "Studio Starter",  "coins": 75,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER"), "desc": "📱 1 full week on 1 platform"},
+            {"id": "studio_pro",     "label": "Studio Pro",      "coins": 200, "price": "$24.99", "price_id": _sec("STRIPE_PRICE_STUDIO_PRO"),     "desc": "📱 2 full weeks, multiple platforms"},
+            {"id": "studio_max",     "label": "Studio Max",      "coins": 900, "price": "$99.99", "price_id": _sec("STRIPE_PRICE_STUDIO_MAX"),     "desc": "📱 Full week ALL platforms + edits"},
         ]
 
         # hold checkout URL in session_state so it survives Streamlit reruns
@@ -1094,14 +1101,16 @@ with tab_coins:
         if "checkout_error" not in st.session_state:
             st.session_state.checkout_error = None
 
+        # ── Standard packs row ────────────────────────────────────────────────
+        st.markdown("#### 🧠 ThinkTank AI Packs")
         _c1, _c2, _c3 = st.columns(3)
-        for _col, _pkg in zip([_c1, _c2, _c3], _PKGS):
+        for _col, _pkg in zip([_c1, _c2, _c3], _PKGS[:3]):
             with _col:
                 with st.container(border=True):
                     st.markdown(f"### {_pkg['label']}")
                     st.markdown(f"**{_pkg['coins']} coins**")
                     st.markdown(f"**{_pkg['price']}** one-time")
-                    st.caption("Coins never expire")
+                    st.caption(_pkg.get("desc", "Coins never expire"))
                     if st.button(f"Buy {_pkg['label']}", key=f"buy_{_pkg['id']}", type="primary", use_container_width=True):
                         if not st.session_state.auth_user:
                             # not logged in — gate the purchase
@@ -1118,6 +1127,36 @@ with tab_coins:
                                 _co = _stripe_checkout(
                                     _pkg["price_id"], _pkg["coins"], _sid, _stripe_key
                                 )
+                                st.session_state.checkout_url = _co["url"]
+                                st.session_state.checkout_error = None
+                            except Exception as _e:
+                                st.session_state.checkout_url = None
+                                st.session_state.checkout_error = f"Payment error: {_e}"
+
+        # ── Content Studio packs row ──────────────────────────────────────────
+        st.markdown("#### 📱 Content Studio Packs")
+        st.caption("Buy coins in bulk for Content Studio — one checkout covers your full week.")
+        _s1, _s2, _s3 = st.columns(3)
+        for _scol, _spkg in zip([_s1, _s2, _s3], _PKGS[3:]):
+            with _scol:
+                with st.container(border=True):
+                    st.markdown(f"### {_spkg['label']}")
+                    st.markdown(f"**{_spkg['coins']} coins**")
+                    st.markdown(f"**{_spkg['price']}** one-time")
+                    st.caption(_spkg.get("desc", ""))
+                    if st.button(f"Buy {_spkg['label']}", key=f"buy_{_spkg['id']}", type="primary", use_container_width=True):
+                        if not st.session_state.auth_user:
+                            st.session_state.checkout_error = None
+                            st.session_state.checkout_url = None
+                            st.session_state["show_login_gate"] = True
+                        elif not _stripe_key:
+                            st.session_state.checkout_error = "Stripe not configured."
+                        elif not _spkg["price_id"]:
+                            st.session_state.checkout_error = f"Price ID for {_spkg['label']} not set in Railway variables."
+                        else:
+                            st.session_state["show_login_gate"] = False
+                            try:
+                                _co = _stripe_checkout(_spkg["price_id"], _spkg["coins"], _sid, _stripe_key)
                                 st.session_state.checkout_url = _co["url"]
                                 st.session_state.checkout_error = None
                             except Exception as _e:
