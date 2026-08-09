@@ -903,11 +903,17 @@ with tab_coins:
                     st.markdown(f"**{_pkg['price']}** one-time")
                     st.caption("Coins never expire")
                     if st.button(f"Buy {_pkg['label']}", key=f"buy_{_pkg['id']}", type="primary", use_container_width=True):
-                        if not _stripe_key:
+                        if not st.session_state.auth_user:
+                            # not logged in — gate the purchase
+                            st.session_state.checkout_error = None
+                            st.session_state.checkout_url = None
+                            st.session_state["show_login_gate"] = True
+                        elif not _stripe_key:
                             st.session_state.checkout_error = "Stripe not configured."
                         elif not _pkg["price_id"]:
                             st.session_state.checkout_error = f"Price ID for {_pkg['label']} not set."
                         else:
+                            st.session_state["show_login_gate"] = False
                             try:
                                 _co = _stripe_checkout(
                                     _pkg["price_id"], _pkg["coins"], _sid, _stripe_key
@@ -917,6 +923,38 @@ with tab_coins:
                             except Exception as _e:
                                 st.session_state.checkout_url = None
                                 st.session_state.checkout_error = f"Payment error: {_e}"
+
+        # show login gate if not logged in
+        if st.session_state.get("show_login_gate"):
+            st.warning("🔑 **Create a free account before purchasing** — so your coins are never lost if you switch browsers or devices.")
+            with st.expander("Log in or Register to continue", expanded=True):
+                _gt = st.radio("", ["Log in", "Register"], horizontal=True, key="gate_auth_mode", label_visibility="collapsed")
+                _ge = st.text_input("Email", key="gate_email", placeholder="you@example.com")
+                _gp = st.text_input("Password", key="gate_pw", type="password", placeholder="Min 6 characters")
+                if _gt == "Log in":
+                    if st.button("Log in & continue to payment", key="gate_login", type="primary", use_container_width=True):
+                        _gr = user_login(_ge, _gp)
+                        if _gr["ok"]:
+                            _anon = st.session_state.get("_GLOBAL_SID", "")
+                            if _anon:
+                                user_merge_session(_gr["email"], _anon)
+                            st.session_state.auth_user = _gr["email"]
+                            st.session_state["show_login_gate"] = False
+                            st.rerun()
+                        else:
+                            st.error(_gr["error"])
+                else:
+                    if st.button("Create account & continue", key="gate_register", type="primary", use_container_width=True):
+                        _gr = user_register(_ge, _gp)
+                        if _gr["ok"]:
+                            _anon = st.session_state.get("_GLOBAL_SID", "")
+                            if _anon:
+                                user_merge_session(_gr["email"], _anon)
+                            st.session_state.auth_user = _gr["email"]
+                            st.session_state["show_login_gate"] = False
+                            st.rerun()
+                        else:
+                            st.error(_gr["error"])
 
         # show checkout button or error OUTSIDE the column loop so it persists after rerun
         if st.session_state.checkout_error:
