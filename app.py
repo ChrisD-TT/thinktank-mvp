@@ -1843,6 +1843,30 @@ with tab_admin:
 
     st.divider()
 
+    # ── Grant Coins (admin tool) ──────────────────────────────────────────────
+    st.markdown("### 🪙 Grant Coins to User")
+    _gc1, _gc2, _gc3 = st.columns([3, 1, 1])
+    with _gc1:
+        _grant_email = st.text_input("Email address", key="grant_email", placeholder="user@example.com")
+    with _gc2:
+        _grant_amount = st.number_input("Coins", min_value=1, max_value=10000, value=200, key="grant_amount")
+    with _gc3:
+        st.markdown("&nbsp;", unsafe_allow_html=True)
+        if st.button("✅ Grant", type="primary", use_container_width=True, key="do_grant_coins"):
+            if not _grant_email.strip():
+                st.error("Enter an email.")
+            else:
+                import importlib as _gcil, thinktank.engine.db as _gcdb
+                _gcdb = _gcil.reload(_gcdb)
+                _gcdb.init_db()
+                _gcdb.coin_get_or_create(_grant_email.strip().lower())
+                _gcdb.coin_credit(_grant_email.strip().lower(), int(_grant_amount),
+                                  f"admin-grant-{_grant_email.strip().lower()}-{_grant_amount}")
+                _new_bal = _gcdb.coin_balance(_grant_email.strip().lower())
+                st.success(f"✅ Granted {_grant_amount} coins to **{_grant_email}** — new balance: **{_new_bal} coins**")
+
+    st.divider()
+
     # ── Database Health Check ─────────────────────────────────────────────────
     st.markdown("### 🗄️ Database Health")
     from thinktank.config import DB_PATH as _ADMIN_DB_PATH
