@@ -1,4 +1,4 @@
-"""
+﻿"""
 ThinkTank — Streamlit UI entry point.
 Run: streamlit run app.py
 """
@@ -46,6 +46,7 @@ else:
 # Ensure DB row exists (grants welcome coins exactly once)
 _GLOBAL_SID = _url_sid
 _gdb_mod.coin_get_or_create(_GLOBAL_SID)
+_gdb_mod.studio_coin_get_or_create(_GLOBAL_SID)
 
 # ── Persistent auth restore ───────────────────────────────────────────────────
 # If session_state lost auth_user (server restart / Railway redeploy),
@@ -56,6 +57,8 @@ if not st.session_state.auth_user:
     _persisted_email = _gdb_mod.sid_get_auth(_GLOBAL_SID)
     if _persisted_email:
         st.session_state.auth_user = _persisted_email
+        _gdb_mod.coin_get_or_create(_persisted_email)
+        _gdb_mod.studio_coin_get_or_create(_persisted_email)
 
 
 def _get_coin_session():
@@ -864,8 +867,6 @@ with tab_studio:
         "single":       7,   # single platform post
         "post_hook":    12,  # post + hashtags + hook (per platform)
         "tiktok":       18,  # TikTok/Reel script
-        "week_one":     350, # full week 1 platform
-        "week_all":     500, # full week all platforms
         "edit":         3,   # edit existing content
     }
     _MULTI_DISC = 0.85  # 15% off when selecting multiple platforms
@@ -875,7 +876,8 @@ with tab_studio:
 
     _studio_sid = _auth_sid()
     import thinktank.engine.db as _sdb
-    _studio_bal = _sdb.coin_balance(_studio_sid)
+    _sdb.studio_coin_get_or_create(_studio_sid)
+    _studio_bal = _sdb.studio_coin_balance(_studio_sid)
     # check if user has free edits based on plan tier
     from thinktank.engine.db import user_get_plan, FREE_EDIT_TIERS
     _user_plan = user_get_plan(st.session_state.auth_user) if st.session_state.auth_user else {"plan_tier": "free"}
@@ -898,14 +900,9 @@ with tab_studio:
         "🎯 Single Post  —  7 coins",
         "🪝 Post + Hashtags + Hook  —  12 coins per platform",
         "🎬 TikTok / Reel Script  —  18 coins",
-        "📅 Full Week — 1 Platform  —  350 coins",
-        "🚀 Full Week — ALL Platforms  —  500 coins",
     ], key="studio_gen_type")
 
     # platform selector
-    if "ALL Platforms" in _gen_type:
-        _sel_platforms = _PLATFORMS
-        st.info("📢 All 5 platforms selected — full week of content for every channel.")
     elif "TikTok" in _gen_type:
         _sel_platforms = ["TikTok"]
     else:
@@ -913,7 +910,7 @@ with tab_studio:
             "Platform(s)", _PLATFORMS, default=["Twitter/X"], key="studio_platforms"
         )
         # multi-platform 15% discount
-        if len(_sel_platforms) > 1 and "Full Week" not in _gen_type:
+        if len(_sel_platforms) > 1:
             _base = _STUDIO_COSTS["post_hook"] if "Hashtags" in _gen_type else _STUDIO_COSTS["single"]
             _full_price = _base * len(_sel_platforms)
             _disc_price = max(1, round(_full_price * _MULTI_DISC))
@@ -923,17 +920,9 @@ with tab_studio:
     _topic = st.text_area("Topic / Brief", placeholder="e.g. Launching ThinkTank — AI decision engine for entrepreneurs", key="studio_topic", height=80)
     _tone  = st.selectbox("Tone", _TONES, key="studio_tone")
 
-    # week schedule toggle + email
-    _schedule_week = False
-    if "Full Week" in _gen_type:
-        _schedule_week = st.toggle("📅 Schedule daily release (Mon–Sun unlocks day by day)", value=True, key="studio_schedule")
-        if _schedule_week:
-            st.info("✉️ Each day's content will unlock at 12:01 AM and be emailed to you automatically — ready every morning.")
 
     # calculate coin cost
     def _studio_cost(gen_type, platforms):
-        if "ALL Platforms" in gen_type:   return _STUDIO_COSTS["week_all"]
-        if "Full Week" in gen_type:        return _STUDIO_COSTS["week_one"]
         if "TikTok" in gen_type:           return _STUDIO_COSTS["tiktok"]
         if "Hashtags" in gen_type:
             base = _STUDIO_COSTS["post_hook"] * len(platforms)
@@ -957,7 +946,7 @@ with tab_studio:
             st.error(f"🪙 Not enough coins. This costs {_cost} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
         else:
             # deduct coins
-            _sdb.coin_spend(_studio_sid, _cost)
+            _sdb.studio_coin_spend(_studio_sid, _cost)
 
             # build prompt per platform — uses STUDIO_SYSTEM_PROMPT for elite content quality
             import thinktank.engine.ai as _sai
@@ -980,13 +969,6 @@ with tab_studio:
                 }.get(plt, "Engaging, platform-appropriate post. Write for a real human audience.")
 
             for _plt in (_PLATFORMS if "ALL Platforms" in _gen_type else _sel_platforms):
-                if "Full Week" in _gen_type:
-                    for _di, _day in enumerate(_days):
-                        _prompt = f"""Write a {_tone.lower()} {_plt} post for {_day} about: {_topic}
-
-This is Day {_di+1} of 7. Vary the angle from other days — don't repeat the same framing.
-{"Also include: 3-5 targeted hashtags AND a scroll-stopping hook line (labeled 'HOOK:') before the post." if "Hashtags" in _gen_type else ""}
-
 Platform requirements: {_plt_style(_plt)}
 
 Return ONLY the final post content, ready to copy-paste and publish. No explanations, no labels, no metadata."""
@@ -1101,7 +1083,7 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
                                     st.error("Not enough coins to save edit. Go to 💳 Buy Coins to top up.")
                                 else:
                                     if not _free_edits:
-                                        _sdb.coin_spend(_studio_sid, 3)
+                                        _sdb.studio_coin_spend(_studio_sid, 3)
                                     studio_update(_c["id"], _edited.strip())
                                     st.success("✅ Saved!")
                                     st.rerun()
@@ -1267,7 +1249,7 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
                         if _studio_bal < _ext_cost:
                             st.error(f"💰 Need {_ext_cost} coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
                         else:
-                            _sdb.coin_spend(_studio_sid, _ext_cost)
+                            _sdb.studio_coin_spend(_studio_sid, _ext_cost)
                             st.session_state.tool_session_end  += _ext_mins * 60
                             st.session_state.tool_session_mins += _ext_mins
                             st.session_state.tool_warned = False
@@ -1518,7 +1500,7 @@ A single reusable prompt they paste into any AI tool to generate on-brand conten
                             if _studio_bal < _sc_final:
                                 st.error(f"💰 Need {_sc_final} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
                             else:
-                                _sdb.coin_spend(_studio_sid, _sc_final)
+                                _sdb.studio_coin_spend(_studio_sid, _sc_final)
                                 tool_session_record(_studio_sid, _sm, _sc_final)
                                 _now  = _time.time()
                                 _end  = _now + (_sm * 60)
@@ -1645,6 +1627,7 @@ with tab_coins:
                     st.session_state.checkout_error = None
                     # upgrade plan tier on click (confirmed on return)
                     st.session_state["pending_tier"] = pkg.get("tier")
+                    st.session_state["pending_is_studio"] = pkg.get("tier") is not None and "studio" in (pkg.get("tier") or "")
                 except Exception as _e:
                     st.session_state.checkout_url   = None
                     st.session_state.checkout_error = f"Payment error: {_e}"
@@ -1758,7 +1741,11 @@ with tab_coins:
                 st.rerun()
 
         st.divider()
-        st.metric("Your Coin Balance", f"{_bal} coins")
+        _ai_bal = _coindb.coin_balance(_sid)
+        _st_bal = _coindb.studio_coin_balance(_sid)
+        _b1, _b2 = st.columns(2)
+        _b1.metric("🧠 AI Coins", f"{_ai_bal}")
+        _b2.metric("🎨 Studio Coins", f"{_st_bal}")
         st.divider()
 
         # ── Handle return from Stripe ─────────────────────────────────────────
@@ -1767,9 +1754,12 @@ with tab_coins:
             _return_coins = int(_qp.get("coins", "0"))
             _return_sid   = _qp.get("session", _sid)
             if _return_coins > 0:
-                _coindb.coin_credit(_return_sid, _return_coins, f"url-credit-{_return_sid}-{_return_coins}")
-                if _return_sid != _sid:
-                    _coindb.coin_credit(_sid, _return_coins, f"url-credit-{_sid}-{_return_coins}")
+                _is_studio_pack = st.session_state.pop("pending_is_studio", False)
+                _credit_sid = st.session_state.auth_user if st.session_state.auth_user else _return_sid
+                if _is_studio_pack:
+                    _coindb.studio_coin_credit(_credit_sid, _return_coins, f"url-credit-{_credit_sid}-{_return_coins}")
+                else:
+                    _coindb.coin_credit(_credit_sid, _return_coins, f"url-credit-{_credit_sid}-{_return_coins}")
             # upgrade plan tier if a studio plan was purchased
             _pending_tier = st.session_state.pop("pending_tier", None)
             _promo_earned = None
@@ -2049,11 +2039,11 @@ with tab_admin:
 # ==============================================================================
 with tab_legal:
     st.subheader("📄 Legal")
-    _legal_choice = st.radio("", ["📋 Terms of Service", "🔒 Privacy Policy"],
-                             horizontal=True, key="legal_choice", label_visibility="collapsed")
+    _legal_choice = st.radio("", ["Terms of Service", "Privacy Policy"],
+                             horizontal=True, key="legal_choice_v2", label_visibility="collapsed")
     st.divider()
 
-    if _legal_choice == "📋 Terms of Service":
+    if _legal_choice == "Terms of Service":
         st.markdown("""
 ## Terms of Service
 
@@ -2164,7 +2154,7 @@ These Terms are governed by the laws of the United States.
 **chris@thinktankapp.net** · www.thinktankapp.net
         """)
 
-    elif _legal_choice == "🔒 Privacy Policy":
+    elif _legal_choice == "Privacy Policy":
         st.markdown("""
 ## Privacy Policy
 

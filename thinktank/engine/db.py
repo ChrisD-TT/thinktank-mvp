@@ -1,4 +1,4 @@
-"""
+﻿"""
 ThinkTank — SQLite persistence layer.
 Handles: ideas, gate_history, chats, chat_messages, users, coins.
 """
@@ -497,6 +497,90 @@ def coin_credit(session_id: str, amount: int, stripe_session: str) -> None:
 
 # ── Content Studio ─────────────────────────────────────────────────────────────
 
+
+
+# -- Studio Coins (separate inventory from AI coins) --
+
+def studio_coin_get_or_create(session_id: str) -> int:
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT coins FROM studio_coin_users WHERE session_id=?", (session_id,)
+        ).fetchone()
+        if row:
+            return row[0]
+        con.execute(
+            "INSERT INTO studio_coin_users(session_id, coins, created_at) VALUES (?, 0, ?)",
+            (session_id, _utc()),
+        )
+        return 0
+
+
+def studio_coin_balance(session_id: str) -> int:
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT coins FROM studio_coin_users WHERE session_id=?", (session_id,)
+        ).fetchone()
+        return row[0] if row else 0
+
+
+def studio_coin_spend(session_id: str, amount: int = 1) -> bool:
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT coins FROM studio_coin_users WHERE session_id=?", (session_id,)
+        ).fetchone()
+        if not row or row[0] < amount:
+            return False
+        con.execute(
+            "UPDATE studio_coin_users SET coins = coins - ? WHERE session_id=?",
+            (amount, session_id),
+        )
+        con.execute(
+            "INSERT INTO studio_coin_transactions(session_id, type, amount, created_at) "
+            "VALUES (?, 'spend', ?, ?)",
+            (session_id, -amount, _utc()),
+        )
+        return True
+
+
+def studio_coin_credit(session_id: str, amount: int, stripe_session: str) -> None:
+    with sqlite3.connect(DB_PATH) as con:
+        already = con.execute(
+            "SELECT id FROM studio_coin_transactions WHERE stripe_session=?", (stripe_session,)
+        ).fetchone()
+        if already:
+            return
+        studio_coin_get_or_create(session_id)
+        con.execute(
+            "UPDATE studio_coin_users SET coins = coins + ? WHERE session_id=?",
+            (amount, session_id),
+        )
+        con.execute(
+            "INSERT INTO studio_coin_transactions(session_id, type, amount, stripe_session, created_at) "
+            "VALUES (?, 'purchase', ?, ?, ?)",
+            (session_id, amount, stripe_session, _utc()),
+        )
+
+
+def studio_coin_merge_session(email: str, anon_sid: str) -> None:
+    if not anon_sid or anon_sid == email:
+        return
+    with sqlite3.connect(DB_PATH) as con:
+        anon_row = con.execute(
+            "SELECT coins FROM studio_coin_users WHERE session_id=?", (anon_sid,)
+        ).fetchone()
+        if not anon_row or anon_row[0] == 0:
+            return
+        studio_coin_get_or_create(email)
+        con.execute(
+            "UPDATE studio_coin_users SET coins = coins + ? WHERE session_id=?",
+            (anon_row[0], email),
+        )
+        con.execute(
+            "INSERT INTO studio_coin_transactions(session_id, type, amount, created_at) "
+            "VALUES (?, 'merge', ?, ?)",
+            (email, anon_row[0], _utc()),
+        )
+        con.execute("DELETE FROM studio_coin_users WHERE session_id=?", (anon_sid,))
 def studio_save(session_id: str, platform: str, topic: str, tone: str,
                 content: str, content_type: str, scheduled_for: str = None) -> int:
     """Save a generated content piece. scheduled_for is ISO date string or None."""
