@@ -301,6 +301,7 @@ with st.sidebar:
     if st.session_state.auth_user:
         st.success(f"👤 {st.session_state.auth_user}")
         if st.button("Log out", key="sidebar_logout", use_container_width=True):
+            _gdb_mod.sid_clear_auth(_GLOBAL_SID)
             st.session_state.auth_user = None
             st.rerun()
     else:
@@ -316,6 +317,7 @@ with st.sidebar:
                         _anon = st.session_state.get("_GLOBAL_SID", "")
                         if _anon:
                             user_merge_session(_res["email"], _anon)
+                        _gdb_mod.sid_save_auth(_GLOBAL_SID, _res["email"])
                         st.session_state.auth_user = _res["email"]
                         st.success("Welcome back!")
                         st.rerun()
@@ -328,6 +330,7 @@ with st.sidebar:
                         _anon = st.session_state.get("_GLOBAL_SID", "")
                         if _anon:
                             user_merge_session(_res["email"], _anon)
+                        _gdb_mod.sid_save_auth(_GLOBAL_SID, _res["email"])
                         st.session_state.auth_user = _res["email"]
                         st.success("Account created! Welcome 🎉")
                         st.rerun()
@@ -439,6 +442,16 @@ else:
 # Ensure DB row exists (grants welcome coins exactly once)
 _GLOBAL_SID = _url_sid
 _gdb_mod.coin_get_or_create(_GLOBAL_SID)
+
+# ── Persistent auth restore ───────────────────────────────────────────────────
+# If session_state lost auth_user (server restart / Railway redeploy),
+# restore it from DB using the sid. This prevents idle logouts.
+if "auth_user" not in st.session_state:
+    st.session_state.auth_user = None
+if not st.session_state.auth_user:
+    _persisted_email = _gdb_mod.sid_get_auth(_GLOBAL_SID)
+    if _persisted_email:
+        st.session_state.auth_user = _persisted_email
 
 
 def _get_coin_session():
@@ -1658,6 +1671,7 @@ with tab_coins:
                             _anon = st.session_state.get("_GLOBAL_SID", "")
                             if _anon:
                                 user_merge_session(_gr["email"], _anon)
+                            _gdb_mod.sid_save_auth(_GLOBAL_SID, _gr["email"])
                             st.session_state.auth_user = _gr["email"]
                             st.session_state["show_login_gate"] = False
                             st.rerun()
@@ -1671,6 +1685,7 @@ with tab_coins:
                             _anon = st.session_state.get("_GLOBAL_SID", "")
                             if _anon:
                                 user_merge_session(_gr["email"], _anon)
+                            _gdb_mod.sid_save_auth(_GLOBAL_SID, _gr["email"])
                             st.session_state.auth_user = _gr["email"]
                             st.session_state["show_login_gate"] = False
                             st.rerun()
@@ -1678,8 +1693,9 @@ with tab_coins:
                             st.error(_gr["error"])
             st.divider()
 
-        # ── ThinkTank AI Packs ────────────────────────────────────────────────
-        st.markdown("#### 🧠 ThinkTank AI Packs")
+        # ── ThinkTank AI Coins ────────────────────────────────────────────────
+        st.markdown("#### 🧠 ThinkTank AI Coins")
+        st.caption("Power the decision engine — Ask, Ideas, Analysis, Gate, Room.")
         _c1, _c2, _c3 = st.columns(3)
         for _col, _pkg in zip([_c1, _c2, _c3], _PKGS[:3]):
             with _col:
@@ -1691,10 +1707,10 @@ with tab_coins:
                     if st.button(f"Buy {_pkg['label']}", key=f"buy_{_pkg['id']}", type="primary", use_container_width=True):
                         _do_buy(_pkg)
 
-        # ── Content Studio Plans ──────────────────────────────────────────────
+        # ── Content Studio Coins ──────────────────────────────────────────────
         st.divider()
-        st.markdown("#### 📱 Content Studio Plans")
-        st.caption("One checkout — no repeat purchases. Coins load instantly after payment.")
+        st.markdown("#### 📱 Content Studio Coins")
+        st.caption("Power the Content Studio — posts, TikTok scripts, full-week content, Creator Power Tools.")
         # row 1: Studio Starter + Studio Pro
         _sr1, _sr2 = st.columns(2)
         for _scol, _spkg in zip([_sr1, _sr2], _PKGS[3:5]):
@@ -1717,14 +1733,24 @@ with tab_coins:
                     if st.button(f"Buy {_spkg['label']}", key=f"buy_{_spkg['id']}", type="primary", use_container_width=True):
                         _do_buy(_spkg)
 
-        # show checkout button or error OUTSIDE the column loop so it persists after rerun
+        # ── Checkout area — anchor for auto-scroll ────────────────────────────
+        st.markdown('<div id="checkout-anchor"></div>', unsafe_allow_html=True)
         if st.session_state.checkout_error:
             st.error(st.session_state.checkout_error)
         if st.session_state.checkout_url:
-            st.success("✅ Checkout ready!")
+            # auto-scroll to checkout the moment the URL appears
+            import streamlit.components.v1 as _pay_components
+            _pay_components.html(
+                "<script>"
+                "window.parent.document.getElementById('checkout-anchor')"
+                ".scrollIntoView({behavior:'smooth',block:'center'});"
+                "</script>",
+                height=0,
+            )
+            st.success("✅ Checkout ready — click below to complete your purchase!")
             st.link_button("👉 Complete Payment on Stripe", st.session_state.checkout_url, type="primary", use_container_width=True)
-            st.info("After payment, return here — your coins will be credited automatically.")
-            st.caption("💡 If the checkout page loads slowly, try opening it in **Chrome or Edge** — Firefox's security settings can slow down Stripe's payment page. It's the browser, not your connection.")
+            st.info("After payment, return here — your coins load automatically.")
+            st.caption("💡 Checkout loads slowly in Firefox? Try Chrome or Edge — it's the browser, not your connection.")
             if st.button("✖ Cancel", key="cancel_checkout"):
                 st.session_state.checkout_url = None
                 st.rerun()
@@ -2021,9 +2047,11 @@ with tab_admin:
 # ==============================================================================
 with tab_legal:
     st.subheader("📄 Legal")
-    _legal_tos, _legal_pp = st.tabs(["📋 Terms of Service", "🔒 Privacy Policy"])
+    _legal_choice = st.radio("", ["📋 Terms of Service", "🔒 Privacy Policy"],
+                             horizontal=True, key="legal_choice", label_visibility="collapsed")
+    st.divider()
 
-    with _legal_tos:
+    if _legal_choice == "📋 Terms of Service":
         st.markdown("""
 ## Terms of Service
 
@@ -2134,7 +2162,7 @@ These Terms are governed by the laws of the United States.
 **chris@thinktankapp.net** · www.thinktankapp.net
         """)
 
-    with _legal_pp:
+    elif _legal_choice == "🔒 Privacy Policy":
         st.markdown("""
 ## Privacy Policy
 

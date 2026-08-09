@@ -696,3 +696,46 @@ def tool_session_clear(session_id: str) -> None:
     """Remove a session record (on expiry or explicit end)."""
     with sqlite3.connect(DB_PATH) as con:
         con.execute("DELETE FROM tool_session_state WHERE session_id=?", (session_id,))
+
+
+# ── Persistent Auth (survives server restarts / Railway redeploys) ────────────
+
+def sid_save_auth(session_id: str, email: str) -> None:
+    """Tie a logged-in email to a URL session ID so auth survives page reloads."""
+    email = email.strip().lower()
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS sid_auth (
+                session_id TEXT PRIMARY KEY,
+                email      TEXT NOT NULL,
+                saved_at   TEXT NOT NULL
+            )"""
+        )
+        con.execute(
+            """INSERT INTO sid_auth(session_id, email, saved_at) VALUES (?, ?, ?)
+               ON CONFLICT(session_id) DO UPDATE SET email=excluded.email, saved_at=excluded.saved_at""",
+            (session_id, email, _utc()),
+        )
+
+
+def sid_get_auth(session_id: str) -> str | None:
+    """Return the email tied to this session ID, or None if not found."""
+    with sqlite3.connect(DB_PATH) as con:
+        # ensure table exists (handles first run before sid_save_auth is called)
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS sid_auth (
+                session_id TEXT PRIMARY KEY,
+                email      TEXT NOT NULL,
+                saved_at   TEXT NOT NULL
+            )"""
+        )
+        row = con.execute(
+            "SELECT email FROM sid_auth WHERE session_id=?", (session_id,)
+        ).fetchone()
+    return row[0] if row else None
+
+
+def sid_clear_auth(session_id: str) -> None:
+    """Remove the auth binding for this session (on explicit logout)."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute("DELETE FROM sid_auth WHERE session_id=?", (session_id,))
