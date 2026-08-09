@@ -1879,28 +1879,34 @@ with tab_admin:
             st.code(_ADMIN_DB_PATH)
             _on_volume = _ADMIN_DB_PATH.startswith("/data")
             if _on_volume:
-                st.success("✅ Pointing at Railway persistent volume `/data`")
+                st.success("✅ On Railway persistent volume — accounts survive redeploys")
             else:
-                st.error("❌ NOT on volume — pointing at container disk. Accounts will wipe on redeploy!")
+                st.error("❌ NOT on volume — container disk resets on every redeploy!")
             if _admin_os.path.exists(_ADMIN_DB_PATH):
                 _db_size = _admin_os.path.getsize(_ADMIN_DB_PATH)
                 st.caption(f"File exists · {_db_size:,} bytes")
             else:
-                st.warning("⚠️ DB file does not exist yet — will be created on first write")
+                st.warning("⚠️ DB file not found at this path yet")
     with _db_col2:
         with st.container(border=True):
             st.markdown("**Resolution chain**")
             import os as _o2
-            _env_val    = _o2.environ.get("DB_PATH", "")
+            from thinktank.config import _clean_path as _cp
+            _env_raw    = _o2.environ.get("DB_PATH", "")
+            _env_val    = _cp(_env_raw)
             _secret_val = ""
             try:
-                _secret_val = st.secrets.get("DB_PATH", "") or ""
+                _secret_val = _cp(st.secrets.get("DB_PATH", "") or "")
             except Exception:
                 pass
-            st.markdown(f"1. Railway env var `DB_PATH`: `{'✅ ' + _env_val if _env_val else '❌ not set'}`")
-            st.markdown(f"2. secrets.toml `DB_PATH`:    `{'✅ ' + _secret_val if _secret_val else '❌ not set'}`")
-            st.markdown(f"3. Fallback:                  `./thinktank/thinktank.sqlite`")
-            st.caption("Fix: set DB_PATH=/data/thinktank.sqlite in Railway → Variables")
+            # show the cleaned value so it's clear what's actually being used
+            st.markdown(f"1. Railway env var: `{'✅ ' + _env_val if _env_val else '❌ not set'}`")
+            if _env_raw and _env_raw != _env_val:
+                st.caption(f"⚠️ Raw value had key prefix — auto-stripped to: `{_env_val}`")
+            st.markdown(f"2. secrets.toml:    `{'✅ ' + _secret_val if _secret_val else '❌ not set'}`")
+            st.markdown(f"3. Fallback:        `./thinktank/thinktank.sqlite`")
+            if not _on_volume:
+                st.error("Go to Railway → Variables → set `DB_PATH` value to `/data/thinktank.sqlite` (no prefix)")
 
     st.divider()
 

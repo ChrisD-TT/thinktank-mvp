@@ -12,19 +12,27 @@ OLLAMA_TIMEOUT  = 300                 # seconds — increase for complex ideas
 # Use /data volume on Railway (persistent across redeploys) or local fallback
 import os as _os
 
+def _clean_path(val: str) -> str:
+    """Strip accidental 'DB_PATH=' prefix if Railway stored the whole key=value string."""
+    val = val.strip()
+    if val.upper().startswith("DB_PATH="):
+        val = val[len("DB_PATH="):].strip()
+    return val
+
+
 def _resolve_db_path() -> str:
     """
     Priority:
     1. DB_PATH env var (set in Railway Variables tab)
-    2. DB_PATH in st.secrets (set in .streamlit/secrets.toml — deployed to Railway)
+    2. DB_PATH in st.secrets (set in .streamlit/secrets.toml)
     3. Local fallback for development
     """
-    env_val = _os.environ.get("DB_PATH", "")
+    env_val = _clean_path(_os.environ.get("DB_PATH", ""))
     if env_val:
         return env_val
     try:
         import streamlit as _st
-        secret_val = _st.secrets.get("DB_PATH", "")
+        secret_val = _clean_path(_st.secrets.get("DB_PATH", "") or "")
         if secret_val:
             return secret_val
     except Exception:
