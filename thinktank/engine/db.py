@@ -99,6 +99,21 @@ CREATE TABLE IF NOT EXISTS tool_session_state (
     mins_total  INTEGER NOT NULL,
     updated_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS studio_coin_users (
+    session_id TEXT    PRIMARY KEY,
+    coins      INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS studio_coin_transactions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id     TEXT    NOT NULL,
+    type           TEXT    NOT NULL,
+    amount         INTEGER NOT NULL,
+    stripe_session TEXT,
+    created_at     TEXT    NOT NULL
+);
 """
 
 
