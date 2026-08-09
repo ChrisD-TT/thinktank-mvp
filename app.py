@@ -814,13 +814,16 @@ with tab_studio:
     from datetime import datetime as _dt, timedelta as _td
 
     # ── Coin costs ────────────────────────────────────────────────────────────
+    # Pricing philosophy: 1 coin ≈ $0.20 (25 coins = $4.99)
+    # Logic/Ask side stays cheap (quick queries). Studio side reflects real
+    # market value — social tools charge $50-$200/mo for what we do per-use.
     _STUDIO_COSTS = {
-        "single":       7,   # single platform post
-        "post_hook":    12,  # post + hashtags + hook (per platform)
-        "tiktok":       18,  # TikTok/Reel script
-        "week_one":     70,  # full week 1 platform
-        "week_all":     850, # full week all platforms
-        "edit":         3,   # edit existing content
+        "single":       10,  # single platform post          → ~$2.00
+        "post_hook":    20,  # post + hashtags + hook        → ~$4.00/platform
+        "tiktok":       30,  # TikTok/Reel script            → ~$6.00 (scripts are high-value)
+        "week_one":     100, # full week 1 platform          → ~$20 (vs $30+/mo tools)
+        "week_all":     500, # full week all platforms       → ~$100 (vs $200/mo tools)
+        "edit":         5,   # edit existing content         → ~$1.00
     }
     _MULTI_DISC = 0.85  # 15% off when selecting multiple platforms
 
@@ -851,11 +854,11 @@ with tab_studio:
     st.markdown("### ✍️ Generate Content")
 
     _gen_type = st.selectbox("Content Type", [
-        "Single Post (7 coins)",
-        "Post + Hashtags + Hook (12 coins per platform)",
-        "TikTok / Reel Script (18 coins)",
-        "Full Week — 1 Platform (70 coins)",
-        "Full Week — ALL Platforms (850 coins)",
+        "Single Post (10 coins)",
+        "Post + Hashtags + Hook (20 coins per platform)",
+        "TikTok / Reel Script (30 coins)",
+        "Full Week — 1 Platform (100 coins)",
+        "Full Week — ALL Platforms (500 coins)",
     ], key="studio_gen_type")
 
     # platform selector
@@ -915,31 +918,84 @@ with tab_studio:
             # deduct coins
             _sdb.coin_spend(_studio_sid, _cost)
 
-            # build prompt per platform
+            # build prompt per platform — uses STUDIO_SYSTEM_PROMPT for elite content quality
             import thinktank.engine.ai as _sai
+            from thinktank.config import STUDIO_SYSTEM_PROMPT as _STUDIO_SYS
             _generated = []
             _days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
             _today = _dt.now().date()
 
+            # Platform-specific style instructions
+            def _plt_style(plt):
+                return {
+                    "Twitter/X":  "Under 280 characters. One sharp idea — hot take, story hook, or punchy insight. No corporate speak. No 'Excited to share.' Punchy and direct.",
+                    "LinkedIn":   "150-300 words. Open with a bold statement or 1-sentence story. Add a blank line between every paragraph. No jargon. End with a question or clear CTA.",
+                    "TikTok":     "Spoken word script, 45-60 seconds when read aloud. Line 1 MUST stop the scroll — make it a hook, not an intro. Short choppy sentences. Hook → value → CTA.",
+                    "Instagram":  "Emotion-first caption. Short punchy opener. Use line breaks for breathing room. Hashtags on the LAST line only, not in the caption body. 3-5 relevant hashtags.",
+                    "Reddit":     "Genuinely helpful, conversational tone. Zero self-promotion or 'check this out' energy. Lead with value. Write like you're helping a friend, not advertising.",
+                    "Facebook":   "Warm, community-first. 100-200 words. Ask a question that invites comments. Share a story, not a statement. Feel like a post from a real person, not a brand.",
+                    "YouTube":    "Video description: Start with exactly what the viewer gets from watching. Keywords naturally in first 2 sentences. Include timestamps placeholder [0:00] if relevant. CTA at end.",
+                    "Threads":    "Raw, casual, personal. Under 500 chars. Like texting your audience. No hashtags needed. One real thought.",
+                }.get(plt, "Engaging, platform-appropriate post. Write for a real human audience.")
+
             for _plt in (_PLATFORMS if "ALL Platforms" in _gen_type else _sel_platforms):
                 if "Full Week" in _gen_type:
                     for _di, _day in enumerate(_days):
-                        _prompt = f"""You are an expert social media strategist.
-Write a {_tone.lower()} {_plt} post for {_day} about: {_topic}
-{"Include hashtags and a hook line." if "Hashtags" in _gen_type else ""}
-Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional tone, 150-300 words" if _plt=="LinkedIn" else "Script with hook, body, CTA, 60 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion" if _plt=="Reddit" else "Friendly and shareable, 100-200 words" if _plt=="Facebook" else "Video description with timestamps and CTA, 200-300 words" if _plt=="YouTube" else "Short casual post under 500 chars" if _plt=="Threads" else "Engaging post ready to publish"}.
-Return only the post content, ready to publish."""
-                        _resp = _sai.chat([{"role":"user","content":_prompt}])
+                        _prompt = f"""Write a {_tone.lower()} {_plt} post for {_day} about: {_topic}
+
+This is Day {_di+1} of 7. Vary the angle from other days — don't repeat the same framing.
+{"Also include: 3-5 targeted hashtags AND a scroll-stopping hook line (labeled 'HOOK:') before the post." if "Hashtags" in _gen_type else ""}
+
+Platform requirements: {_plt_style(_plt)}
+
+Return ONLY the final post content, ready to copy-paste and publish. No explanations, no labels, no metadata."""
+                        _resp = _sai.chat([
+                            {"role": "system", "content": _STUDIO_SYS},
+                            {"role": "user",   "content": _prompt},
+                        ])
                         _sched = (_today + _td(days=_di)).isoformat() if _schedule_week else None
                         _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, "week_post", _sched)
                         _generated.append({"platform":_plt,"day":_day,"content":_resp,"id":_sid_val,"released": not _schedule_week})
                 else:
                     _ctype = "tiktok_script" if "TikTok" in _gen_type else "post_hook" if "Hashtags" in _gen_type else "single_post"
-                    _prompt = f"""You are an expert social media strategist.
-Write a {_tone.lower()} {_plt} {"post with hashtags and a compelling hook line" if "Hashtags" in _gen_type else "TikTok script with hook, body, and CTA" if "TikTok" in _gen_type else "post"} about: {_topic}
-Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional, 150-300 words" if _plt=="LinkedIn" else "60-second script, hook in first 3 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion" if _plt=="Reddit" else "Friendly and shareable, 100-200 words" if _plt=="Facebook" else "Video description with timestamps and CTA" if _plt=="YouTube" else "Short casual post under 500 chars"}.
-Return only the post content, ready to publish."""
-                    _resp = _sai.chat([{"role":"user","content":_prompt}])
+                    if "TikTok" in _gen_type:
+                        _prompt = f"""Write a TikTok/Reel video script about: {_topic}
+Tone: {_tone}
+
+Structure:
+HOOK (first 2 seconds — must stop the scroll, spoken out loud):
+[write hook here]
+
+BODY (the value, 30-45 seconds spoken):
+[write body here — short sentences, rhythm, conversational]
+
+CTA (last 5 seconds):
+[write CTA here — specific action, not generic "follow me"]
+
+Platform requirements: {_plt_style("TikTok")}
+
+Return ONLY the script with the HOOK / BODY / CTA labels. Ready to read on camera."""
+                    elif "Hashtags" in _gen_type:
+                        _prompt = f"""Write a {_tone.lower()} {_plt} post about: {_topic}
+
+Include:
+1. A HOOK line (scroll-stopping opener, labeled "HOOK:")
+2. The full post body
+3. 5 targeted hashtags (labeled "HASHTAGS:") on the final line
+
+Platform requirements: {_plt_style(_plt)}
+
+Return ONLY the hook, post, and hashtags — ready to publish."""
+                    else:
+                        _prompt = f"""Write a {_tone.lower()} {_plt} post about: {_topic}
+
+Platform requirements: {_plt_style(_plt)}
+
+Return ONLY the post — ready to copy-paste and publish. No explanations."""
+                    _resp = _sai.chat([
+                        {"role": "system", "content": _STUDIO_SYS},
+                        {"role": "user",   "content": _prompt},
+                    ])
                     _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, _ctype, None)
                     _generated.append({"platform":_plt,"day":None,"content":_resp,"id":_sid_val,"released":True})
 
@@ -1017,166 +1073,285 @@ Return only the post content, ready to publish."""
     # ==============================================================================
     # CREATOR POWER TOOLS
     # ==============================================================================
+    # CREATOR POWER TOOLS — TIMED SESSION ACCESS
+    # ==============================================================================
+    import time as _time
+    from thinktank.config import STUDIO_SYSTEM_PROMPT as _STUDIO_SYS
+
     st.divider()
     st.markdown("### 🔧 Creator Power Tools")
-    st.caption("Advanced tools that make your content stand out. Each charges coins per use.")
 
-    _tool_tab1, _tool_tab2, _tool_tab3 = st.tabs(["🪝 Hook Generator", "♻️ Repurpose Engine", "🎙️ Brand Voice Builder"])
+    # ── Timed Session constants ───────────────────────────────────────────────
+    # Each tier unlocks N minutes. Cost is in coins. 1 coin ≈ $0.20
+    _TOOL_SESSIONS = {
+        "10 min  —  15 coins  (~$3)":  {"minutes": 10,  "coins": 15},
+        "20 min  —  25 coins  (~$5)":  {"minutes": 20,  "coins": 25},
+        "45 min  —  50 coins  (~$10)": {"minutes": 45,  "coins": 50},
+        "90 min  —  90 coins  (~$18)": {"minutes": 90,  "coins": 90},
+    }
+    _WARN_SECS = 180   # warn when 3 minutes remain
+    _TICK_SECS = 30    # how often Streamlit auto-reruns to refresh the timer
 
-    # ── Hook Generator (4 coins) ──────────────────────────────────────────────
-    with _tool_tab1:
-        st.markdown("**Generate 5 scroll-stopping hooks for your content** — the first 3 seconds that make people stop and watch.")
-        st.caption("Cost: **4 coins** per generation")
-        _hook_topic    = st.text_area("What is your video/post about?", key="hook_topic", height=80,
-                                       placeholder="e.g. How I built a $10k/month business in 90 days")
-        _hook_platform = st.selectbox("Platform", ["TikTok", "Instagram Reels", "YouTube Shorts", "Twitter/X", "LinkedIn"], key="hook_platform")
-        _hook_tone     = st.selectbox("Tone", _TONES, key="hook_tone")
+    # ── Session state keys ────────────────────────────────────────────────────
+    for _k, _v in {
+        "tool_session_active":    False,
+        "tool_session_start":     0.0,
+        "tool_session_end":       0.0,
+        "tool_session_mins":      0,
+        "tool_warned":            False,
+    }.items():
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
 
-        if st.button("🪝 Generate Hooks", key="gen_hooks", type="primary", use_container_width=True):
-            if not st.session_state.auth_user:
-                st.error("🔑 Please log in first — use the sidebar.")
-            elif not _hook_topic.strip():
-                st.error("Enter a topic first.")
-            elif _studio_bal < 4:
-                st.error(f"💰 Need 4 coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
+    def _tool_seconds_left() -> int:
+        return max(0, int(st.session_state.tool_session_end - _time.time()))
+
+    def _tool_fmt(secs: int) -> str:
+        m, s = divmod(secs, 60)
+        return f"{m}:{s:02d}"
+
+    # ── Gate: must be logged in ───────────────────────────────────────────────
+    if not st.session_state.auth_user:
+        st.info("🔑 Log in to access Creator Power Tools.")
+    else:
+        # ── Active session display ────────────────────────────────────────────
+        if st.session_state.tool_session_active:
+            _secs_left = _tool_seconds_left()
+
+            if _secs_left <= 0:
+                # Session expired
+                st.session_state.tool_session_active = False
+                st.session_state.tool_warned = False
+                st.error("⏱️ **Your Power Tools session has ended.** Select a new session below to continue.")
+                # fall through to session picker below
             else:
-                _sdb.coin_spend(_studio_sid, 4)
-                import thinktank.engine.ai as _hai
-                _hook_prompt = f"""You are an expert viral content strategist.
-Generate 5 different scroll-stopping hooks for a {_hook_platform} {_hook_tone.lower()} post/video about: {_hook_topic}
+                # Auto-rerun every _TICK_SECS so the timer refreshes
+                _components_loaded = False
+                try:
+                    import streamlit.components.v1 as _tc
+                    _tc.html(
+                        f"<script>setTimeout(function(){{window.parent.location.reload();}},{_TICK_SECS * 1000});</script>",
+                        height=0,
+                    )
+                    _components_loaded = True
+                except Exception:
+                    pass
 
-Rules:
-- Each hook must grab attention in the FIRST 3 SECONDS
-- Mix styles: question, bold statement, curiosity gap, controversy, story opener
-- Be specific, not generic
-- Format: numbered list 1-5, one hook per line, no explanations
+                # Warning banner when < 3 minutes left
+                if _secs_left <= _WARN_SECS:
+                    st.warning(
+                        f"⚠️ **{_tool_fmt(_secs_left)} remaining** in your Power Tools session. "
+                        f"Extend now to keep working without interruption."
+                    )
+                    st.session_state.tool_warned = True
+                else:
+                    _pct = int((_secs_left / (st.session_state.tool_session_mins * 60)) * 100)
+                    st.success(f"✅ Session active — **{_tool_fmt(_secs_left)} remaining** ({_pct}% of your time left)")
 
-Return only the 5 hooks, numbered."""
-                with st.spinner("Generating hooks..."):
-                    _hook_result = _hai.chat([{"role": "user", "content": _hook_prompt}])
-                st.session_state["hook_result"] = _hook_result
-                st.session_state["hook_cost_paid"] = 4
+                # Extend session inline
+                with st.expander("⏳ Extend my session", expanded=st.session_state.tool_warned):
+                    _ext_choice = st.selectbox("Add time", list(_TOOL_SESSIONS.keys()), key="extend_choice")
+                    _ext_data = _TOOL_SESSIONS[_ext_choice]
+                    _ext_cost = _ext_data["coins"]
+                    _ext_mins = _ext_data["minutes"]
+                    st.caption(f"Adds **{_ext_mins} minutes** · costs **{_ext_cost} coins** · you have **{_studio_bal} coins**")
+                    if st.button(f"⏳ Add {_ext_mins} min ({_ext_cost} coins)", key="extend_session", type="primary"):
+                        if _studio_bal < _ext_cost:
+                            st.error(f"💰 Need {_ext_cost} coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
+                        else:
+                            _sdb.coin_spend(_studio_sid, _ext_cost)
+                            st.session_state.tool_session_end += _ext_mins * 60
+                            st.session_state.tool_session_mins += _ext_mins
+                            st.session_state.tool_warned = False
+                            st.success(f"✅ Session extended by {_ext_mins} minutes!")
+                            st.rerun()
 
-        if st.session_state.get("hook_result"):
-            st.success(f"✅ 4 coins used · 5 hooks ready")
-            st.markdown("#### Your Hooks")
-            st.markdown(st.session_state["hook_result"])
-            if st.button("📋 Copy All", key="copy_hooks"):
-                st.code(st.session_state["hook_result"])
+                st.divider()
 
-    # ── Repurpose Engine (6 coins) ────────────────────────────────────────────
-    with _tool_tab2:
-        st.markdown("**Turn 1 piece of content into versions for every platform** — write once, post everywhere.")
-        st.caption("Cost: **6 coins** per repurpose (covers all selected platforms)")
-        _repurpose_src = st.text_area("Paste your original content here", key="repurpose_src", height=150,
-                                       placeholder="Paste a blog post, tweet, video script, caption — anything.")
-        _repurpose_platforms = st.multiselect("Repurpose for these platforms",
-            ["Twitter/X", "LinkedIn", "TikTok Script", "Instagram Caption", "Facebook", "YouTube Description", "Threads", "Reddit"],
-            default=["Twitter/X", "LinkedIn", "Instagram Caption"], key="repurpose_platforms")
-        _repurpose_tone = st.selectbox("Tone", _TONES, key="repurpose_tone")
+                # ── The actual tools (only visible during active session) ─────
+                _tool_tab1, _tool_tab2, _tool_tab3 = st.tabs(["🪝 Hook Generator", "♻️ Repurpose Engine", "🎙️ Brand Voice Builder"])
 
-        if st.button("♻️ Repurpose Content", key="gen_repurpose", type="primary", use_container_width=True):
-            if not st.session_state.auth_user:
-                st.error("🔑 Please log in first — use the sidebar.")
-            elif not _repurpose_src.strip():
-                st.error("Paste some content to repurpose.")
-            elif not _repurpose_platforms:
-                st.error("Select at least one platform.")
-            elif _studio_bal < 6:
-                st.error(f"💰 Need 6 coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
-            else:
-                _sdb.coin_spend(_studio_sid, 6)
-                import thinktank.engine.ai as _rai
-                _plat_list = ", ".join(_repurpose_platforms)
-                _repurpose_prompt = f"""You are an expert social media strategist.
-Repurpose the following content into optimized versions for these platforms: {_plat_list}
+                # ── Hook Generator ────────────────────────────────────────────
+                with _tool_tab1:
+                    st.markdown("**5 scroll-stopping hooks** — the opening line that makes people stop and watch.")
+                    _hook_topic    = st.text_area("What is your video/post about?", key="hook_topic", height=80,
+                                                   placeholder="e.g. How I built a $10k/month business in 90 days")
+                    _hook_platform = st.selectbox("Platform", ["TikTok", "Instagram Reels", "YouTube Shorts", "Twitter/X", "LinkedIn"], key="hook_platform")
+                    _hook_tone     = st.selectbox("Tone", _TONES, key="hook_tone")
 
-ORIGINAL CONTENT:
+                    if st.button("🪝 Generate Hooks", key="gen_hooks", type="primary", use_container_width=True):
+                        if not _hook_topic.strip():
+                            st.error("Enter a topic first.")
+                        else:
+                            import thinktank.engine.ai as _hai
+                            _hook_prompt = f"""Generate 5 different scroll-stopping hooks for a {_hook_platform} {_hook_tone.lower()} post/video about: {_hook_topic}
+
+Each hook must grab attention in the FIRST 2-3 SECONDS when read or heard.
+Mix these 5 styles — one of each:
+1. Bold claim / controversial statement
+2. Curiosity gap ("Here's what nobody tells you about...")
+3. Direct question that challenges an assumption
+4. Micro-story opener (first sentence of a story)
+5. Specific surprising number or fact
+
+Be specific to this exact topic. Generic hooks like "Have you ever wondered..." are banned.
+Format: numbered list 1-5, one hook per line. Return only the hooks."""
+                            with st.spinner("Generating hooks..."):
+                                _hook_result = _hai.chat([
+                                    {"role": "system", "content": _STUDIO_SYS},
+                                    {"role": "user",   "content": _hook_prompt},
+                                ])
+                            st.session_state["hook_result"] = _hook_result
+
+                    if st.session_state.get("hook_result"):
+                        st.success("✅ 5 hooks ready")
+                        st.markdown("#### Your Hooks")
+                        st.markdown(st.session_state["hook_result"])
+                        if st.button("📋 Show as plain text", key="copy_hooks"):
+                            st.code(st.session_state["hook_result"])
+
+                # ── Repurpose Engine ──────────────────────────────────────────
+                with _tool_tab2:
+                    st.markdown("**Write once, post everywhere** — one piece of content remixed for every platform.")
+                    _repurpose_src = st.text_area("Paste your original content here", key="repurpose_src", height=150,
+                                                   placeholder="Paste a blog post, tweet, video script, caption — anything.")
+                    _repurpose_platforms = st.multiselect(
+                        "Repurpose for these platforms",
+                        ["Twitter/X", "LinkedIn", "TikTok Script", "Instagram Caption", "Facebook", "YouTube Description", "Threads", "Reddit"],
+                        default=["Twitter/X", "LinkedIn", "Instagram Caption"],
+                        key="repurpose_platforms",
+                    )
+                    _repurpose_tone = st.selectbox("Tone", _TONES, key="repurpose_tone")
+
+                    if st.button("♻️ Repurpose Content", key="gen_repurpose", type="primary", use_container_width=True):
+                        if not _repurpose_src.strip():
+                            st.error("Paste some content to repurpose.")
+                        elif not _repurpose_platforms:
+                            st.error("Select at least one platform.")
+                        else:
+                            import thinktank.engine.ai as _rai
+                            _plat_list = ", ".join(_repurpose_platforms)
+                            _repurpose_prompt = f"""Repurpose the following content into {_repurpose_tone.lower()}-tone versions for: {_plat_list}
+
+ORIGINAL:
 {_repurpose_src}
 
-Tone: {_repurpose_tone}
+Platform rules to follow exactly:
+- Twitter/X: Under 280 chars. One sharp idea. Punchy, direct. No corporate speak.
+- LinkedIn: 150-300 words. Bold opener. Whitespace between paragraphs. End with CTA or question.
+- TikTok Script: Spoken word. HOOK line first. Short sentences. Hook → value → CTA. 45-60 sec read.
+- Instagram Caption: Emotion first. Line breaks for breathing room. Hashtags on LAST line only.
+- Facebook: Warm, community feel. 100-200 words. Ask a question. Story, not broadcast.
+- YouTube Description: What viewer gets up front. Keywords in first 2 sentences. CTA at end.
+- Threads: Raw, personal, under 500 chars. Like a text to a friend.
+- Reddit: Pure value, zero promo tone. Conversational. Community first.
 
-For each platform, rewrite the content following that platform's best practices:
-- Twitter/X: Under 280 chars, punchy, no fluff
-- LinkedIn: Professional, 150-300 words, story-driven
-- TikTok Script: Hook + body + CTA, spoken word style, 60 seconds
-- Instagram Caption: Emojis, line breaks, hashtags at end
-- Facebook: Friendly, conversational, 100-200 words
-- YouTube Description: Timestamps, keywords, CTA, 200-300 words
-- Threads: Casual, under 500 chars
-- Reddit: No self-promotion tone, add value, conversational
+Format each version with "## [Platform]" as a header. Return all versions, ready to copy-paste."""
+                            with st.spinner(f"Repurposing for {len(_repurpose_platforms)} platforms..."):
+                                _repurpose_result = _rai.chat([
+                                    {"role": "system", "content": _STUDIO_SYS},
+                                    {"role": "user",   "content": _repurpose_prompt},
+                                ])
+                            st.session_state["repurpose_result"] = _repurpose_result
+                            st.session_state["repurpose_platforms_used"] = _repurpose_platforms
 
-Format: Use "## [Platform Name]" as header for each section. Return all versions."""
-                with st.spinner(f"Repurposing for {len(_repurpose_platforms)} platforms..."):
-                    _repurpose_result = _rai.chat([{"role": "user", "content": _repurpose_prompt}])
-                st.session_state["repurpose_result"] = _repurpose_result
-                st.session_state["repurpose_platforms_used"] = _repurpose_platforms
+                    if st.session_state.get("repurpose_result"):
+                        st.success(f"✅ {len(st.session_state.get('repurpose_platforms_used', []))} platform versions ready")
+                        st.markdown("#### Repurposed Content")
+                        st.markdown(st.session_state["repurpose_result"])
 
-        if st.session_state.get("repurpose_result"):
-            st.success(f"✅ 6 coins used · {len(st.session_state.get('repurpose_platforms_used', []))} platform versions ready")
-            st.markdown("#### Repurposed Content")
-            st.markdown(st.session_state["repurpose_result"])
+                # ── Brand Voice Builder ───────────────────────────────────────
+                with _tool_tab3:
+                    st.markdown("**Your Brand Voice Profile** — so every future post sounds like YOU, not generic AI.")
+                    _bv_name     = st.text_input("Your name / brand name", key="bv_name",
+                                                  placeholder="e.g. Shamar Williams / ThinkTank")
+                    _bv_niche    = st.text_input("Your niche / industry", key="bv_niche",
+                                                  placeholder="e.g. Entrepreneur, Music Producer, Fitness Coach")
+                    _bv_audience = st.text_input("Your target audience", key="bv_audience",
+                                                  placeholder="e.g. Young entrepreneurs, 18-35, want financial freedom")
+                    _bv_examples = st.text_area("Paste 2-3 examples of your best posts (optional but strongly recommended)",
+                                                 key="bv_examples", height=120,
+                                                 placeholder="Paste captions, tweets, or anything you've written that sounds most like you...")
+                    _bv_words    = st.text_input("3 words that describe your vibe", key="bv_words",
+                                                  placeholder="e.g. Bold, Authentic, Motivational")
 
-    # ── Brand Voice Builder (8 coins) ─────────────────────────────────────────
-    with _tool_tab3:
-        st.markdown("**Define your unique brand voice** — so all future content sounds like YOU, not generic AI.")
-        st.caption("Cost: **8 coins** to generate your Brand Voice Profile")
-        _bv_name     = st.text_input("Your name / brand name", key="bv_name", placeholder="e.g. Shamar Williams / ThinkTank")
-        _bv_niche    = st.text_input("Your niche / industry", key="bv_niche", placeholder="e.g. Entrepreneur, Music Producer, Fitness Coach")
-        _bv_audience = st.text_input("Your target audience", key="bv_audience", placeholder="e.g. Young entrepreneurs, 18-35, want financial freedom")
-        _bv_examples = st.text_area("Paste 2-3 examples of your best posts (optional but recommended)", key="bv_examples",
-                                     height=120, placeholder="Paste captions, tweets, or anything you've written that sounds most like you...")
-        _bv_words    = st.text_input("3 words that describe your vibe", key="bv_words", placeholder="e.g. Bold, Authentic, Motivational")
-
-        if st.button("🎙️ Build My Brand Voice", key="gen_brand_voice", type="primary", use_container_width=True):
-            if not st.session_state.auth_user:
-                st.error("🔑 Please log in first — use the sidebar.")
-            elif not _bv_name.strip() or not _bv_niche.strip():
-                st.error("Enter your name and niche at minimum.")
-            elif _studio_bal < 8:
-                st.error(f"💰 Need 8 coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
-            else:
-                _sdb.coin_spend(_studio_sid, 8)
-                import thinktank.engine.ai as _bai
-                _bv_prompt = f"""You are a brand strategist and copywriter.
-Build a complete Brand Voice Profile for:
+                    if st.button("🎙️ Build My Brand Voice", key="gen_brand_voice", type="primary", use_container_width=True):
+                        if not _bv_name.strip() or not _bv_niche.strip():
+                            st.error("Enter your name and niche at minimum.")
+                        else:
+                            import thinktank.engine.ai as _bai
+                            _bv_prompt = f"""Build a complete, specific Brand Voice Profile for:
 
 Name/Brand: {_bv_name}
 Niche: {_bv_niche}
-Target Audience: {_bv_audience or "not specified"}
-Vibe Words: {_bv_words or "not specified"}
-{"Example Content:" + chr(10) + _bv_examples if _bv_examples.strip() else ""}
+Audience: {_bv_audience or "not specified"}
+Vibe words: {_bv_words or "not specified"}
+{"Sample content from this creator:\n" + _bv_examples if _bv_examples.strip() else ""}
 
-Create a detailed Brand Voice Profile with these sections:
+Create a Brand Voice Profile with these exact sections:
 
 ## 🎙️ Brand Voice Summary
-(2-3 sentences capturing their overall voice and personality)
+2-3 sentences. What does this voice sound like? What makes it unmistakably theirs?
 
-## ✅ Do Use (10 specific rules for this brand)
-(Sentence starters, tone cues, formatting habits, word choices to always use)
+## ✅ Do Use — 10 Specific Rules
+Concrete rules: sentence starters they use, formatting habits, specific word choices, tones, energy levels. Not generic like "be authentic" — specific like "start sentences with 'Here's the truth:'"
 
-## ❌ Never Do (5 anti-patterns to avoid)
-(Generic phrases, tones, or styles that would kill their brand voice)
+## ❌ Never Do — 5 Anti-Patterns
+Specific phrases, tones, or structures that would sound completely off-brand for this person.
 
-## 💬 Signature Phrases
-(5 phrases or sentence structures unique to this brand — ready to use)
+## 💬 5 Signature Phrases
+Ready-to-use phrases or sentence templates that sound uniquely like them. These should feel native to their voice.
 
 ## 📱 Platform Adaptations
-(How to adapt this voice for Twitter/X, LinkedIn, TikTok, and Instagram while staying on-brand)
+How to express this same voice differently on Twitter/X, LinkedIn, TikTok, and Instagram. Same person, different energy per platform.
 
-## 🚀 Quick-Start Prompt Template
-(A fill-in-the-blank AI prompt they can reuse to generate on-brand content every time)
+## 🚀 Reusable AI Prompt Template
+A fill-in-the-blank prompt they can paste into any AI tool to generate on-brand content instantly. Include [TOPIC], [PLATFORM], and [TONE] placeholders.
 
-Make it specific, actionable, and uniquely tailored to their personality."""
-                with st.spinner("Building your Brand Voice Profile..."):
-                    _bv_result = _bai.chat([{"role": "user", "content": _bv_prompt}])
-                st.session_state["brand_voice_result"] = _bv_result
+Be specific, not generic. Every rule and phrase should only make sense for THIS person."""
+                            with st.spinner("Building your Brand Voice Profile..."):
+                                _bv_result = _bai.chat([
+                                    {"role": "system", "content": _STUDIO_SYS},
+                                    {"role": "user",   "content": _bv_prompt},
+                                ])
+                            st.session_state["brand_voice_result"] = _bv_result
 
-        if st.session_state.get("brand_voice_result"):
-            st.success("✅ 8 coins used · Your Brand Voice Profile is ready")
-            st.markdown("---")
-            st.markdown(st.session_state["brand_voice_result"])
-            st.info("💡 Save this profile somewhere safe — paste it into any AI tool as context to make all your future content sound like you.")
+                    if st.session_state.get("brand_voice_result"):
+                        st.success("✅ Your Brand Voice Profile is ready")
+                        st.markdown("---")
+                        st.markdown(st.session_state["brand_voice_result"])
+                        st.info("💡 Save this — paste it as context into any AI tool and your content will always sound like you.")
+
+        # ── No active session — show session picker ───────────────────────────
+        if not st.session_state.tool_session_active or _tool_seconds_left() <= 0:
+            st.markdown(
+                "**Creator Power Tools** give you timed studio access — like renting professional equipment. "
+                "Pick a session length, spend your coins, and the tools unlock for that window."
+            )
+            st.caption("⏱️ Your timer only runs while this tab is open. Coins are spent when you start the session.")
+
+            _session_cols = st.columns(2)
+            _session_items = list(_TOOL_SESSIONS.items())
+            for _si, (_slabel, _sdata) in enumerate(_session_items):
+                with _session_cols[_si % 2]:
+                    with st.container(border=True):
+                        _sm, _sc = _sdata["minutes"], _sdata["coins"]
+                        st.markdown(f"### ⏱️ {_sm} Minutes")
+                        st.markdown(f"**{_sc} coins** · ~${_sc * 0.20:.0f} value")
+                        _per_min = round(_sc / _sm, 1)
+                        st.caption(f"{_per_min} coins/min · {'Best value' if _sm >= 45 else 'Quick session'}")
+                        if st.button(f"Unlock {_sm} min", key=f"start_session_{_sm}", type="primary", use_container_width=True):
+                            if _studio_bal < _sc:
+                                st.error(f"💰 Need {_sc} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
+                            else:
+                                _sdb.coin_spend(_studio_sid, _sc)
+                                _now = _time.time()
+                                st.session_state.tool_session_active = True
+                                st.session_state.tool_session_start  = _now
+                                st.session_state.tool_session_end    = _now + (_sm * 60)
+                                st.session_state.tool_session_mins   = _sm
+                                st.session_state.tool_warned         = False
+                                st.rerun()
 
 
 with tab_coins:
