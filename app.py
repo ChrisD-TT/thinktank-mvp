@@ -818,8 +818,8 @@ with tab_studio:
         "single":       7,   # single platform post
         "post_hook":    12,  # post + hashtags + hook (per platform)
         "tiktok":       18,  # TikTok/Reel script
-        "week_one":     70,  # full week 1 platform
-        "week_all":     850, # full week all platforms
+        "week_one":     350, # full week 1 platform
+        "week_all":     500, # full week all platforms
         "edit":         3,   # edit existing content
     }
     _MULTI_DISC = 0.85  # 15% off when selecting multiple platforms
@@ -854,8 +854,8 @@ with tab_studio:
         "🎯 Single Post  —  7 coins",
         "🪝 Post + Hashtags + Hook  —  12 coins per platform",
         "🎬 TikTok / Reel Script  —  18 coins",
-        "📅 Full Week — 1 Platform  —  70 coins",
-        "🚀 Full Week — ALL Platforms  —  850 coins",
+        "📅 Full Week — 1 Platform  —  350 coins",
+        "🚀 Full Week — ALL Platforms  —  500 coins",
     ], key="studio_gen_type")
 
     # platform selector
