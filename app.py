@@ -20,6 +20,7 @@ from thinktank.engine.modes import (
     run_ask, ensure_default_chat,
 )
 from thinktank import config as cfg
+import thinktank.engine.db as _gdb_mod
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="ThinkTank", page_icon="🧠", layout="wide")
@@ -421,7 +422,6 @@ tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab
 # session_state is secondary cache only.
 # ==============================================================================
 import uuid as _uuid_mod
-import thinktank.engine.db as _gdb_mod
 _gdb_mod.init_db()
 
 # 1. URL param is the source of truth
