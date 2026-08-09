@@ -903,7 +903,7 @@ with tab_studio:
     ], key="studio_gen_type")
 
     # platform selector
-    elif "TikTok" in _gen_type:
+    if "TikTok" in _gen_type:
         _sel_platforms = ["TikTok"]
     else:
         _sel_platforms = st.multiselect(
@@ -948,83 +948,65 @@ with tab_studio:
             # deduct coins
             _sdb.studio_coin_spend(_studio_sid, _cost)
 
-            # build prompt per platform — uses STUDIO_SYSTEM_PROMPT for elite content quality
             import thinktank.engine.ai as _sai
             from thinktank.config import STUDIO_SYSTEM_PROMPT as _STUDIO_SYS
             _generated = []
-            _days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-            _today = _dt.now().date()
 
-            # Platform-specific style instructions
             def _plt_style(plt):
                 return {
-                    "Twitter/X":  "Under 280 characters. One sharp idea — hot take, story hook, or punchy insight. No corporate speak. No 'Excited to share.' Punchy and direct.",
-                    "LinkedIn":   "150-300 words. Open with a bold statement or 1-sentence story. Add a blank line between every paragraph. No jargon. End with a question or clear CTA.",
-                    "TikTok":     "Spoken word script, 45-60 seconds when read aloud. Line 1 MUST stop the scroll — make it a hook, not an intro. Short choppy sentences. Hook → value → CTA.",
-                    "Instagram":  "Emotion-first caption. Short punchy opener. Use line breaks for breathing room. Hashtags on the LAST line only, not in the caption body. 3-5 relevant hashtags.",
-                    "Reddit":     "Genuinely helpful, conversational tone. Zero self-promotion or 'check this out' energy. Lead with value. Write like you're helping a friend, not advertising.",
-                    "Facebook":   "Warm, community-first. 100-200 words. Ask a question that invites comments. Share a story, not a statement. Feel like a post from a real person, not a brand.",
-                    "YouTube":    "Video description: Start with exactly what the viewer gets from watching. Keywords naturally in first 2 sentences. Include timestamps placeholder [0:00] if relevant. CTA at end.",
-                    "Threads":    "Raw, casual, personal. Under 500 chars. Like texting your audience. No hashtags needed. One real thought.",
+                    "Twitter/X":  "Under 280 characters. One sharp idea - hot take, story hook, or punchy insight. No corporate speak. Punchy and direct.",
+                    "LinkedIn":   "150-300 words. Open with a bold statement or 1-sentence story. Blank line between every paragraph. End with a question or clear CTA.",
+                    "TikTok":     "Spoken word script, 45-60 seconds when read aloud. Line 1 MUST stop the scroll. Short choppy sentences. Hook then value then CTA.",
+                    "Instagram":  "Emotion-first caption. Short punchy opener. Line breaks for breathing room. Hashtags on the LAST line only. 3-5 relevant hashtags.",
+                    "Reddit":     "Genuinely helpful, conversational tone. Zero self-promotion. Lead with value. Write like you are helping a friend.",
+                    "Facebook":   "Warm, community-first. 100-200 words. Ask a question that invites comments. Feel like a post from a real person.",
+                    "YouTube":    "Video description: Start with what the viewer gets. Keywords in first 2 sentences. CTA at end.",
+                    "Threads":    "Raw, casual, personal. Under 500 chars. Like texting your audience. No hashtags needed.",
                 }.get(plt, "Engaging, platform-appropriate post. Write for a real human audience.")
 
-            for _plt in (_PLATFORMS if "ALL Platforms" in _gen_type else _sel_platforms):
-Platform requirements: {_plt_style(_plt)}
-
-Return ONLY the final post content, ready to copy-paste and publish. No explanations, no labels, no metadata."""
-                        _resp = _sai.chat([
-                            {"role": "system", "content": _STUDIO_SYS},
-                            {"role": "user",   "content": _prompt},
-                        ])
-                        _sched = (_today + _td(days=_di)).isoformat() if _schedule_week else None
-                        _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, "week_post", _sched)
-                        _generated.append({"platform":_plt,"day":_day,"content":_resp,"id":_sid_val,"released": not _schedule_week})
+            _ctype = "tiktok_script" if "TikTok" in _gen_type else "post_hook" if "Hashtags" in _gen_type else "single_post"
+            for _plt in _sel_platforms:
+                if "TikTok" in _gen_type:
+                    _prompt = (
+                        f"Write a TikTok/Reel video script about: {_topic}\n"
+                        f"Tone: {_tone}\n\n"
+                        "Structure:\n"
+                        "HOOK (first 2 seconds - must stop the scroll, spoken out loud):\n"
+                        "[write hook here]\n\n"
+                        "BODY (the value, 30-45 seconds spoken):\n"
+                        "[write body here - short sentences, rhythm, conversational]\n\n"
+                        "CTA (last 5 seconds):\n"
+                        "[write CTA here - specific action, not generic follow me]\n\n"
+                        f"Platform requirements: {_plt_style('TikTok')}\n\n"
+                        "Return ONLY the script with HOOK / BODY / CTA labels. Ready to read on camera."
+                    )
+                elif "Hashtags" in _gen_type:
+                    _prompt = (
+                        f"Write a {_tone.lower()} {_plt} post about: {_topic}\n\n"
+                        "Include:\n"
+                        "1. A HOOK line (scroll-stopping opener, labeled HOOK:)\n"
+                        "2. The full post body\n"
+                        "3. 5 targeted hashtags (labeled HASHTAGS:) on the final line\n\n"
+                        f"Platform requirements: {_plt_style(_plt)}\n\n"
+                        "Return ONLY the hook, post, and hashtags - ready to publish."
+                    )
                 else:
-                    _ctype = "tiktok_script" if "TikTok" in _gen_type else "post_hook" if "Hashtags" in _gen_type else "single_post"
-                    if "TikTok" in _gen_type:
-                        _prompt = f"""Write a TikTok/Reel video script about: {_topic}
-Tone: {_tone}
-
-Structure:
-HOOK (first 2 seconds — must stop the scroll, spoken out loud):
-[write hook here]
-
-BODY (the value, 30-45 seconds spoken):
-[write body here — short sentences, rhythm, conversational]
-
-CTA (last 5 seconds):
-[write CTA here — specific action, not generic "follow me"]
-
-Platform requirements: {_plt_style("TikTok")}
-
-Return ONLY the script with the HOOK / BODY / CTA labels. Ready to read on camera."""
-                    elif "Hashtags" in _gen_type:
-                        _prompt = f"""Write a {_tone.lower()} {_plt} post about: {_topic}
-
-Include:
-1. A HOOK line (scroll-stopping opener, labeled "HOOK:")
-2. The full post body
-3. 5 targeted hashtags (labeled "HASHTAGS:") on the final line
-
-Platform requirements: {_plt_style(_plt)}
-
-Return ONLY the hook, post, and hashtags — ready to publish."""
-                    else:
-                        _prompt = f"""Write a {_tone.lower()} {_plt} post about: {_topic}
-
-Platform requirements: {_plt_style(_plt)}
-
-Return ONLY the post — ready to copy-paste and publish. No explanations."""
-                    _resp = _sai.chat([
-                        {"role": "system", "content": _STUDIO_SYS},
-                        {"role": "user",   "content": _prompt},
-                    ])
-                    _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, _ctype, None)
-                    _generated.append({"platform":_plt,"day":None,"content":_resp,"id":_sid_val,"released":True})
+                    _prompt = (
+                        f"Write a {_tone.lower()} {_plt} post about: {_topic}\n\n"
+                        f"Platform requirements: {_plt_style(_plt)}\n\n"
+                        "Return ONLY the post - ready to copy-paste and publish. No explanations."
+                    )
+                _resp = _sai.chat([
+                    {"role": "system", "content": _STUDIO_SYS},
+                    {"role": "user",   "content": _prompt},
+                ])
+                _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, _ctype, None)
+                _generated.append({"platform": _plt, "day": None, "content": _resp, "id": _sid_val, "released": True})
 
             st.session_state["studio_generated"] = _generated
             st.session_state["studio_cost_paid"] = _cost
             st.rerun()
+
 
     # ── Show just-generated content ───────────────────────────────────────────
     if st.session_state.get("studio_generated"):
