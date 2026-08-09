@@ -1217,6 +1217,7 @@ with tab_coins:
             st.success("✅ Checkout ready!")
             st.link_button("👉 Complete Payment on Stripe", st.session_state.checkout_url, type="primary", use_container_width=True)
             st.info("After payment, return here — your coins will be credited automatically.")
+            st.caption("💡 If the checkout page loads slowly, try opening it in **Chrome or Edge** — Firefox's security settings can slow down Stripe's payment page. It's the browser, not your connection.")
             if st.button("✖ Cancel", key="cancel_checkout"):
                 st.session_state.checkout_url = None
                 st.rerun()
