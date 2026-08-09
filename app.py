@@ -1843,179 +1843,186 @@ with tab_admin:
                 st.rerun()
             else:
                 st.error("Incorrect password.")
-        st.stop()
 
-    st.subheader("⚙️ Admin / Settings")
-
-    from thinktank.engine.ai import is_available, chat as ai_chat
-
-    def _get_secret(key):
-        import os
-        try:
-            val = st.secrets.get(key, "") or ""
-            return val if val else os.environ.get(key, "")
-        except Exception:
-            return os.environ.get(key, "")
-
-    # ── AI Backend Status ─────────────────────────────────────────────────────
-    st.markdown("### 🤖 AI Backend Status")
-
-    openai_key = _get_secret("OPENAI_API_KEY")
-    if openai_key:
-        st.info("🟢 **Active provider: OpenAI (gpt-4o-mini)** — Ollama is available as fallback")
-    else:
-        st.info("🟡 **Active provider: Ollama** — Add OPENAI_API_KEY to secrets/env to use OpenAI")
-
-    col_ai1, col_ai2 = st.columns(2)
-
-    with col_ai1:
-        st.markdown("**OpenAI (gpt-4o-mini)**")
-        if st.button("Check OpenAI Connection", type="primary"):
-            if not openai_key:
-                st.warning("⚠️ No OPENAI_API_KEY found")
-            else:
-                try:
-                    ai_chat([{"role": "user", "content": "ping"}])
-                    st.success("✅ OpenAI is connected · Active AI provider")
-                except Exception as e:
-                    st.error(f"❌ OpenAI error: {e}")
-
-    with col_ai2:
-        st.markdown("**Ollama (Local Fallback)**")
-        if st.button("Check Ollama Connection"):
-            ok, msg = is_available(cfg.OLLAMA_MODEL)
-            if ok:
-                st.success(f"✅ Ollama running · Model `{cfg.OLLAMA_MODEL}` ready")
-            else:
-                st.warning(f"⚠️ {msg}")
-                st.code(f"ollama serve\nollama pull {cfg.OLLAMA_MODEL}", language="bash")
-
-    st.divider()
-
-    # ── Grant Coins (admin tool) ──────────────────────────────────────────────
-    st.markdown("### 🪙 Grant Coins to User")
-    _gc1, _gc2, _gc3 = st.columns([3, 1, 1])
-    with _gc1:
-        _grant_email = st.text_input("Email address", key="grant_email", placeholder="user@example.com")
-    with _gc2:
-        _grant_amount = st.number_input("Coins", min_value=1, max_value=10000, value=200, key="grant_amount")
-    with _gc3:
-        st.markdown("&nbsp;", unsafe_allow_html=True)
-        if st.button("✅ Grant", type="primary", use_container_width=True, key="do_grant_coins"):
-            if not _grant_email.strip():
-                st.error("Enter an email.")
-            else:
-                import thinktank.engine.db as _gcdb
-                _gcdb.coin_get_or_create(_grant_email.strip().lower())
-                _gcdb.coin_credit(_grant_email.strip().lower(), int(_grant_amount),
-                                  f"admin-grant-{_grant_email.strip().lower()}-{_grant_amount}")
-                _new_bal = _gcdb.coin_balance(_grant_email.strip().lower())
-                st.success(f"✅ Granted {_grant_amount} coins to **{_grant_email}** — new balance: **{_new_bal} coins**")
-
-    st.divider()
-
-    # ── Database Health Check ─────────────────────────────────────────────────
-    st.markdown("### 🗄️ Database Health")
-    from thinktank.config import DB_PATH as _ADMIN_DB_PATH
-    import os as _admin_os
-
-    _db_col1, _db_col2 = st.columns(2)
-    with _db_col1:
-        with st.container(border=True):
-            st.markdown("**Active DB Path**")
-            st.code(_ADMIN_DB_PATH)
-            _on_volume = _ADMIN_DB_PATH.startswith("/data")
-            if _on_volume:
-                st.success("✅ On Railway persistent volume — accounts survive redeploys")
-            else:
-                st.error("❌ NOT on volume — container disk resets on every redeploy!")
-            if _admin_os.path.exists(_ADMIN_DB_PATH):
-                _db_size = _admin_os.path.getsize(_ADMIN_DB_PATH)
-                st.caption(f"File exists · {_db_size:,} bytes")
-            else:
-                st.warning("⚠️ DB file not found at this path yet")
-    with _db_col2:
-        with st.container(border=True):
-            st.markdown("**Resolution chain**")
-            import os as _o2
-            from thinktank.config import _clean_path as _cp
-            _env_raw    = _o2.environ.get("DB_PATH", "")
-            _env_val    = _cp(_env_raw)
-            _secret_val = ""
+    if st.session_state.admin_unlocked:
+        from thinktank.engine.ai import is_available, chat as ai_chat
+    
+        def _get_secret(key):
+            import os
             try:
-                _secret_val = _cp(st.secrets.get("DB_PATH", "") or "")
+                val = st.secrets.get(key, "") or ""
+                return val if val else os.environ.get(key, "")
             except Exception:
-                pass
-            # show the cleaned value so it's clear what's actually being used
-            st.markdown(f"1. Railway env var: `{'✅ ' + _env_val if _env_val else '❌ not set'}`")
-            if _env_raw and _env_raw != _env_val:
-                st.caption(f"⚠️ Raw value had key prefix — auto-stripped to: `{_env_val}`")
-            st.markdown(f"2. secrets.toml:    `{'✅ ' + _secret_val if _secret_val else '❌ not set'}`")
-            st.markdown(f"3. Fallback:        `./thinktank/thinktank.sqlite`")
-            if not _on_volume:
-                st.error("Go to Railway → Variables → set `DB_PATH` value to `/data/thinktank.sqlite` (no prefix)")
-
-    st.divider()
-
-    st.markdown("### 📝 Configuration")
-    st.caption("Edit `thinktank/config.py` to change any of these settings.")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**AI Model**")
-        with st.container(border=True):
-            st.markdown(f"**Model:** `{cfg.OLLAMA_MODEL}`")
-            st.markdown(f"**Ollama URL:** `{cfg.OLLAMA_BASE_URL}`")
-            st.markdown(f"**Timeout:** `{cfg.OLLAMA_TIMEOUT}s`")
-
-        st.markdown("**Storage**")
-        with st.container(border=True):
-            st.markdown(f"**DB Path:** `{cfg.DB_PATH}`")
-            st.markdown(f"**Ask Memory:** Unlimited (`{cfg.ASK_MAX_TURNS:,}` turns max)")
-
-    with col2:
-        st.markdown("**Gate Thresholds** *(1–5 scale)*")
-        with st.container(border=True):
-            t = {
-                "🔴 Abort if risk >=":      cfg.GATE_ABORT_RISK_AT_OR_ABOVE,
-                "✅ Proceed if impact >=":  cfg.GATE_PROCEED_MIN_IMPACT,
-                "✅ Proceed if effort <=":  cfg.GATE_PROCEED_MAX_EFFORT,
-                "✅ Proceed if risk <=":    cfg.GATE_PROCEED_MAX_RISK,
-                "⚠️ Caution if risk >=":   cfg.GATE_CAUTION_RISK_AT_OR_ABOVE,
-                "⚠️ Caution if effort >=": cfg.GATE_CAUTION_EFFORT_AT_OR_ABOVE,
-                "🔴 Stop if impact <=":    cfg.GATE_STOP_MAX_IMPACT,
-            }
-            for label, val in t.items():
-                st.markdown(f"**{label}:** `{val}`")
-
-    st.divider()
-
-    st.markdown("### 📊 Database Stats")
-    ideas_count = len(list_ideas(limit=99999))
-    gates_count = len(list_gate_history(limit=99999))
-    chats_count = len(chat_list(limit=99999))
-    s1, s2, s3 = st.columns(3)
-    s1.metric("Ideas stored",   ideas_count)
-    s2.metric("Gate decisions", gates_count)
-    s3.metric("Chat threads",   chats_count)
-
-    st.divider()
-
-    st.markdown("### 📋 All Gate History")
-    all_gates = list_gate_history(limit=50)
-    if all_gates:
-        for row in all_gates:
-            em = {"OK": "✅", "CAUTION": "⚠️", "STOP": "❌"}.get(row["signal"], "❓")
+                return os.environ.get(key, "")
+    
+        # ── AI Backend Status ─────────────────────────────────────────────────────
+        st.markdown("### 🤖 AI Backend Status")
+    
+        openai_key = _get_secret("OPENAI_API_KEY")
+        if openai_key:
+            st.info("🟢 **Active provider: OpenAI (gpt-4o-mini)** — Ollama is available as fallback")
+        else:
+            st.info("🟡 **Active provider: Ollama** — Add OPENAI_API_KEY to secrets/env to use OpenAI")
+    
+        col_ai1, col_ai2 = st.columns(2)
+    
+        with col_ai1:
+            st.markdown("**OpenAI (gpt-4o-mini)**")
+            if st.button("Check OpenAI Connection", type="primary"):
+                if not openai_key:
+                    st.warning("⚠️ No OPENAI_API_KEY found")
+                else:
+                    try:
+                        ai_chat([{"role": "user", "content": "ping"}])
+                        st.success("✅ OpenAI is connected · Active AI provider")
+                    except Exception as e:
+                        st.error(f"❌ OpenAI error: {e}")
+    
+        with col_ai2:
+            st.markdown("**Ollama (Local Fallback)**")
+            if st.button("Check Ollama Connection"):
+                ok, msg = is_available(cfg.OLLAMA_MODEL)
+                if ok:
+                    st.success(f"✅ Ollama running · Model `{cfg.OLLAMA_MODEL}` ready")
+                else:
+                    st.warning(f"⚠️ {msg}")
+                    st.code(f"ollama serve\nollama pull {cfg.OLLAMA_MODEL}", language="bash")
+    
+        st.divider()
+    
+        # ── Grant Coins (admin tool) ──────────────────────────────────────────────
+        st.markdown("### 🪙 Grant Coins to User")
+        _gc1, _gc2, _gc3, _gc4 = st.columns([3, 1, 1, 1])
+        with _gc1:
+            _grant_email = st.text_input("Email address", key="grant_email", placeholder="user@example.com")
+        with _gc2:
+            _grant_amount = st.number_input("Coins", min_value=1, max_value=10000, value=200, key="grant_amount")
+        with _gc3:
+            _grant_wallet = st.selectbox("Wallet", ["🧠 AI Coins", "🎨 Studio Coins"], key="grant_wallet")
+        with _gc4:
+            st.markdown("&nbsp;", unsafe_allow_html=True)
+            if st.button("✅ Grant", type="primary", use_container_width=True, key="do_grant_coins"):
+                if not _grant_email.strip():
+                    st.error("Enter an email.")
+                else:
+                    import thinktank.engine.db as _gcdb
+                    _ge = _grant_email.strip().lower()
+                    _ga = int(_grant_amount)
+                    if "Studio" in _grant_wallet:
+                        _gcdb.studio_coin_get_or_create(_ge)
+                        _gcdb.studio_coin_credit(_ge, _ga, f"admin-grant-studio-{_ge}-{_ga}")
+                        _new_bal = _gcdb.studio_coin_balance(_ge)
+                        st.success(f"✅ Granted {_ga} Studio coins to **{_grant_email}** — Studio balance: **{_new_bal}**")
+                    else:
+                        _gcdb.coin_get_or_create(_ge)
+                        _gcdb.coin_credit(_ge, _ga, f"admin-grant-ai-{_ge}-{_ga}")
+                        _new_bal = _gcdb.coin_balance(_ge)
+                        st.success(f"✅ Granted {_ga} AI coins to **{_grant_email}** — AI balance: **{_new_bal}**")
+    
+        st.divider()
+    
+        # ── Database Health Check ─────────────────────────────────────────────────
+        st.markdown("### 🗄️ Database Health")
+        from thinktank.config import DB_PATH as _ADMIN_DB_PATH
+        import os as _admin_os
+    
+        _db_col1, _db_col2 = st.columns(2)
+        with _db_col1:
             with st.container(border=True):
-                ca, cb = st.columns([3, 1])
-                with ca:
-                    st.markdown(f"{em} **{row['verdict']}** — Idea #{row['idea_id']} · Gate #{row['id']}")
-                    st.caption(f"I{row['impact']}/E{row['effort']}/R{row['risk']}/N{row['novelty']}  ·  {_fmt_ts(row['created_at'])}")
-                with cb:
-                    st.caption(row["recommended_action"])
-    else:
-        st.caption("No gate history yet.")
-
+                st.markdown("**Active DB Path**")
+                st.code(_ADMIN_DB_PATH)
+                _on_volume = _ADMIN_DB_PATH.startswith("/data")
+                if _on_volume:
+                    st.success("✅ On Railway persistent volume — accounts survive redeploys")
+                else:
+                    st.error("❌ NOT on volume — container disk resets on every redeploy!")
+                if _admin_os.path.exists(_ADMIN_DB_PATH):
+                    _db_size = _admin_os.path.getsize(_ADMIN_DB_PATH)
+                    st.caption(f"File exists · {_db_size:,} bytes")
+                else:
+                    st.warning("⚠️ DB file not found at this path yet")
+        with _db_col2:
+            with st.container(border=True):
+                st.markdown("**Resolution chain**")
+                import os as _o2
+                from thinktank.config import _clean_path as _cp
+                _env_raw    = _o2.environ.get("DB_PATH", "")
+                _env_val    = _cp(_env_raw)
+                _secret_val = ""
+                try:
+                    _secret_val = _cp(st.secrets.get("DB_PATH", "") or "")
+                except Exception:
+                    pass
+                # show the cleaned value so it's clear what's actually being used
+                st.markdown(f"1. Railway env var: `{'✅ ' + _env_val if _env_val else '❌ not set'}`")
+                if _env_raw and _env_raw != _env_val:
+                    st.caption(f"⚠️ Raw value had key prefix — auto-stripped to: `{_env_val}`")
+                st.markdown(f"2. secrets.toml:    `{'✅ ' + _secret_val if _secret_val else '❌ not set'}`")
+                st.markdown(f"3. Fallback:        `./thinktank/thinktank.sqlite`")
+                if not _on_volume:
+                    st.error("Go to Railway → Variables → set `DB_PATH` value to `/data/thinktank.sqlite` (no prefix)")
+    
+        st.divider()
+    
+        st.markdown("### 📝 Configuration")
+        st.caption("Edit `thinktank/config.py` to change any of these settings.")
+    
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**AI Model**")
+            with st.container(border=True):
+                st.markdown(f"**Model:** `{cfg.OLLAMA_MODEL}`")
+                st.markdown(f"**Ollama URL:** `{cfg.OLLAMA_BASE_URL}`")
+                st.markdown(f"**Timeout:** `{cfg.OLLAMA_TIMEOUT}s`")
+    
+            st.markdown("**Storage**")
+            with st.container(border=True):
+                st.markdown(f"**DB Path:** `{cfg.DB_PATH}`")
+                st.markdown(f"**Ask Memory:** Unlimited (`{cfg.ASK_MAX_TURNS:,}` turns max)")
+    
+        with col2:
+            st.markdown("**Gate Thresholds** *(1–5 scale)*")
+            with st.container(border=True):
+                t = {
+                    "🔴 Abort if risk >=":      cfg.GATE_ABORT_RISK_AT_OR_ABOVE,
+                    "✅ Proceed if impact >=":  cfg.GATE_PROCEED_MIN_IMPACT,
+                    "✅ Proceed if effort <=":  cfg.GATE_PROCEED_MAX_EFFORT,
+                    "✅ Proceed if risk <=":    cfg.GATE_PROCEED_MAX_RISK,
+                    "⚠️ Caution if risk >=":   cfg.GATE_CAUTION_RISK_AT_OR_ABOVE,
+                    "⚠️ Caution if effort >=": cfg.GATE_CAUTION_EFFORT_AT_OR_ABOVE,
+                    "🔴 Stop if impact <=":    cfg.GATE_STOP_MAX_IMPACT,
+                }
+                for label, val in t.items():
+                    st.markdown(f"**{label}:** `{val}`")
+    
+        st.divider()
+    
+        st.markdown("### 📊 Database Stats")
+        ideas_count = len(list_ideas(limit=99999))
+        gates_count = len(list_gate_history(limit=99999))
+        chats_count = len(chat_list(limit=99999))
+        s1, s2, s3 = st.columns(3)
+        s1.metric("Ideas stored",   ideas_count)
+        s2.metric("Gate decisions", gates_count)
+        s3.metric("Chat threads",   chats_count)
+    
+        st.divider()
+    
+        st.markdown("### 📋 All Gate History")
+        all_gates = list_gate_history(limit=50)
+        if all_gates:
+            for row in all_gates:
+                em = {"OK": "✅", "CAUTION": "⚠️", "STOP": "❌"}.get(row["signal"], "❓")
+                with st.container(border=True):
+                    ca, cb = st.columns([3, 1])
+                    with ca:
+                        st.markdown(f"{em} **{row['verdict']}** — Idea #{row['idea_id']} · Gate #{row['id']}")
+                        st.caption(f"I{row['impact']}/E{row['effort']}/R{row['risk']}/N{row['novelty']}  ·  {_fmt_ts(row['created_at'])}")
+                    with cb:
+                        st.caption(row["recommended_action"])
+        else:
+            st.caption("No gate history yet.")
+    
 # ==============================================================================
 # LEGAL TAB
 # ==============================================================================
