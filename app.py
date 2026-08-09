@@ -814,16 +814,13 @@ with tab_studio:
     from datetime import datetime as _dt, timedelta as _td
 
     # ── Coin costs ────────────────────────────────────────────────────────────
-    # Pricing philosophy: 1 coin ≈ $0.20 (25 coins = $4.99)
-    # Logic/Ask side stays cheap (quick queries). Studio side reflects real
-    # market value — social tools charge $50-$200/mo for what we do per-use.
     _STUDIO_COSTS = {
-        "single":       10,  # single platform post          → ~$2.00
-        "post_hook":    20,  # post + hashtags + hook        → ~$4.00/platform
-        "tiktok":       30,  # TikTok/Reel script            → ~$6.00 (scripts are high-value)
-        "week_one":     100, # full week 1 platform          → ~$20 (vs $30+/mo tools)
-        "week_all":     500, # full week all platforms       → ~$100 (vs $200/mo tools)
-        "edit":         5,   # edit existing content         → ~$1.00
+        "single":       7,   # single platform post
+        "post_hook":    12,  # post + hashtags + hook (per platform)
+        "tiktok":       18,  # TikTok/Reel script
+        "week_one":     70,  # full week 1 platform
+        "week_all":     850, # full week all platforms
+        "edit":         3,   # edit existing content
     }
     _MULTI_DISC = 0.85  # 15% off when selecting multiple platforms
 
@@ -854,11 +851,11 @@ with tab_studio:
     st.markdown("### ✍️ Generate Content")
 
     _gen_type = st.selectbox("Content Type", [
-        "Single Post (10 coins)",
-        "Post + Hashtags + Hook (20 coins per platform)",
-        "TikTok / Reel Script (30 coins)",
-        "Full Week — 1 Platform (100 coins)",
-        "Full Week — ALL Platforms (500 coins)",
+        "Single Post (7 coins)",
+        "Post + Hashtags + Hook (12 coins per platform)",
+        "TikTok / Reel Script (18 coins)",
+        "Full Week — 1 Platform (70 coins)",
+        "Full Week — ALL Platforms (850 coins)",
     ], key="studio_gen_type")
 
     # platform selector
