@@ -68,6 +68,19 @@ CREATE TABLE IF NOT EXISTS coin_transactions (
     stripe_session TEXT,
     created_at     TEXT    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS studio_content (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   TEXT    NOT NULL,
+    platform     TEXT    NOT NULL,
+    topic        TEXT    NOT NULL,
+    tone         TEXT    NOT NULL,
+    content      TEXT    NOT NULL,
+    content_type TEXT    NOT NULL,
+    scheduled_for TEXT,
+    released     INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT    NOT NULL
+);
 """
 
 
@@ -398,3 +411,65 @@ def coin_credit(session_id: str, amount: int, stripe_session: str) -> None:
             "VALUES (?, 'purchase', ?, ?, ?)",
             (session_id, amount, stripe_session, _utc()),
         )
+
+
+# ── Content Studio ─────────────────────────────────────────────────────────────
+
+def studio_save(session_id: str, platform: str, topic: str, tone: str,
+                content: str, content_type: str, scheduled_for: str = None) -> int:
+    """Save a generated content piece. scheduled_for is ISO date string or None."""
+    with sqlite3.connect(DB_PATH) as con:
+        cur = con.execute(
+            """INSERT INTO studio_content
+               (session_id, platform, topic, tone, content, content_type, scheduled_for, released, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_id, platform, topic, tone, content, content_type,
+             scheduled_for, 1 if scheduled_for is None else 0, _utc()),
+        )
+        return int(cur.lastrowid)
+
+
+def studio_release_due(session_id: str) -> None:
+    """Mark content as released if its scheduled_for date has passed."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "UPDATE studio_content SET released=1 WHERE session_id=? AND released=0 AND scheduled_for<=?",
+            (session_id, today),
+        )
+
+
+def studio_list(session_id: str) -> list[dict]:
+    """Return all content for a session, releasing any due items first."""
+    studio_release_due(session_id)
+    with sqlite3.connect(DB_PATH) as con:
+        rows = con.execute(
+            """SELECT id, platform, topic, tone, content, content_type,
+                      scheduled_for, released, created_at
+               FROM studio_content WHERE session_id=?
+               ORDER BY scheduled_for ASC, created_at ASC""",
+            (session_id,),
+        ).fetchall()
+    return [_studio_row(r) for r in rows]
+
+
+def studio_update(content_id: int, new_content: str) -> None:
+    """Update content text after a paid edit."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "UPDATE studio_content SET content=? WHERE id=?",
+            (new_content, content_id),
+        )
+
+
+def studio_delete(content_id: int) -> None:
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute("DELETE FROM studio_content WHERE id=?", (content_id,))
+
+
+def _studio_row(r) -> dict:
+    return {
+        "id": r[0], "platform": r[1], "topic": r[2], "tone": r[3],
+        "content": r[4], "content_type": r[5], "scheduled_for": r[6],
+        "released": bool(r[7]), "created_at": r[8],
+    }

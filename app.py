@@ -372,8 +372,8 @@ with st.sidebar:
     st.caption("🔗 " + _share_url)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_coins, tab_admin = st.tabs(
-    ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "💳 Buy Coins", "⚙️ Admin"]
+tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin = st.tabs(
+    ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin"]
 )
 
 # ==============================================================================
@@ -806,6 +806,206 @@ with tab_room:
 # ==============================================================================
 # BUY COINS TAB
 # ==============================================================================
+# ==============================================================================
+# CONTENT STUDIO TAB
+# ==============================================================================
+with tab_studio:
+    from thinktank.engine.db import studio_save, studio_list, studio_update, studio_delete
+    from datetime import datetime as _dt, timedelta as _td
+
+    # ── Coin costs ────────────────────────────────────────────────────────────
+    _STUDIO_COSTS = {
+        "single":       7,   # single platform post
+        "post_hook":    4,   # post + hashtags + hook (per platform)
+        "tiktok":       7,   # TikTok/Reel script
+        "week_one":     70,  # full week 1 platform
+        "week_all":     850, # full week all platforms
+        "edit":         2,   # edit existing content
+    }
+
+    _PLATFORMS = ["Twitter/X", "LinkedIn", "TikTok", "Instagram", "Reddit"]
+    _TONES     = ["Professional", "Casual", "Viral", "Informative", "Bold"]
+
+    _studio_sid = _auth_sid()
+    import importlib as _sil, thinktank.engine.db as _sdb
+    _sdb = _sil.reload(_sdb)
+    _sdb.init_db()
+    _studio_bal = _sdb.coin_balance(_studio_sid)
+
+    st.subheader("📱 Content Studio")
+    st.caption("AI-generated social media content. Coins are charged per generation.")
+
+    # ── Coin balance indicator ────────────────────────────────────────────────
+    _scol1, _scol2 = st.columns([3,1])
+    with _scol2:
+        st.metric("🪙 Coins", _studio_bal)
+
+    st.divider()
+
+    # ── Generator ─────────────────────────────────────────────────────────────
+    st.markdown("### ✍️ Generate Content")
+
+    _gen_type = st.selectbox("Content Type", [
+        "Single Post (7 coins)",
+        "Post + Hashtags + Hook (4 coins each platform)",
+        "TikTok / Reel Script (7 coins)",
+        "Full Week — 1 Platform (70 coins)",
+        "Full Week — ALL Platforms (850 coins)",
+    ], key="studio_gen_type")
+
+    # platform selector
+    if "ALL Platforms" in _gen_type:
+        _sel_platforms = _PLATFORMS
+        st.info("📢 All 5 platforms selected — full week of content for every channel.")
+    elif "TikTok" in _gen_type:
+        _sel_platforms = ["TikTok"]
+    else:
+        _sel_platforms = st.multiselect(
+            "Platform(s)", _PLATFORMS, default=["Twitter/X"], key="studio_platforms"
+        )
+        # multi-platform multiplier
+        if len(_sel_platforms) > 1 and "Full Week" not in _gen_type:
+            _base = _STUDIO_COSTS["post_hook"] if "Hashtags" in _gen_type else _STUDIO_COSTS["single"]
+            _full_price = _base * len(_sel_platforms)
+            _disc_price = max(1, round(_full_price * 0.75))
+            st.success(f"🎁 Multi-platform discount! {len(_sel_platforms)} platforms × {_base} coins = ~~{_full_price}~~ **{_disc_price} coins** (25% off)")
+
+    _topic = st.text_area("Topic / Brief", placeholder="e.g. Launching ThinkTank — AI decision engine for entrepreneurs", key="studio_topic", height=80)
+    _tone  = st.selectbox("Tone", _TONES, key="studio_tone")
+
+    # week schedule toggle
+    _schedule_week = False
+    if "Full Week" in _gen_type:
+        _schedule_week = st.toggle("📅 Schedule daily release (Mon–Sun unlocks day by day)", value=True, key="studio_schedule")
+        if _schedule_week:
+            st.info("Content will unlock one day at a time. Visit daily to see your next post.")
+
+    # calculate coin cost
+    def _studio_cost(gen_type, platforms):
+        if "ALL Platforms" in gen_type:   return _STUDIO_COSTS["week_all"]
+        if "Full Week" in gen_type:        return _STUDIO_COSTS["week_one"]
+        if "TikTok" in gen_type:           return _STUDIO_COSTS["tiktok"]
+        if "Hashtags" in gen_type:
+            base = _STUDIO_COSTS["post_hook"] * len(platforms)
+            if len(platforms) > 1: base = max(1, round(base * 0.75))
+            return base
+        base = _STUDIO_COSTS["single"] * len(platforms)
+        if len(platforms) > 1: base = max(1, round(base * 0.75))
+        return base
+
+    _cost = _studio_cost(_gen_type, _sel_platforms if "ALL Platforms" not in _gen_type else _PLATFORMS)
+    st.markdown(f"**Cost: {_cost} coins**")
+
+    if st.button("🚀 Generate Content", key="studio_generate", type="primary", use_container_width=True):
+        if not st.session_state.auth_user:
+            st.error("🔑 Please log in first — use the sidebar to log in or register.")
+        elif not _topic.strip():
+            st.error("Please enter a topic or brief.")
+        elif not _sel_platforms:
+            st.error("Please select at least one platform.")
+        elif _studio_bal < _cost:
+            st.error(f"🪙 Not enough coins. This costs {_cost} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
+        else:
+            # deduct coins
+            _sdb.coin_spend(_studio_sid, _cost)
+
+            # build prompt per platform
+            import thinktank.engine.ai as _sai
+            _generated = []
+            _days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+            _today = _dt.now().date()
+
+            for _plt in (_PLATFORMS if "ALL Platforms" in _gen_type else _sel_platforms):
+                if "Full Week" in _gen_type:
+                    for _di, _day in enumerate(_days):
+                        _prompt = f"""You are an expert social media strategist.
+Write a {_tone.lower()} {_plt} post for {_day} about: {_topic}
+{"Include hashtags and a hook line." if "Hashtags" in _gen_type else ""}
+Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional tone, 150-300 words" if _plt=="LinkedIn" else "Script with hook, body, CTA, 60 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion tone for Reddit"}.
+Return only the post content, ready to publish."""
+                        _resp = _sai.chat([{"role":"user","content":_prompt}])
+                        _sched = (_today + _td(days=_di)).isoformat() if _schedule_week else None
+                        _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, "week_post", _sched)
+                        _generated.append({"platform":_plt,"day":_day,"content":_resp,"id":_sid_val,"released": not _schedule_week})
+                else:
+                    _ctype = "tiktok_script" if "TikTok" in _gen_type else "post_hook" if "Hashtags" in _gen_type else "single_post"
+                    _prompt = f"""You are an expert social media strategist.
+Write a {_tone.lower()} {_plt} {"post with hashtags and a compelling hook line" if "Hashtags" in _gen_type else "TikTok script with hook, body, and CTA" if "TikTok" in _gen_type else "post"} about: {_topic}
+Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional, 150-300 words" if _plt=="LinkedIn" else "60-second script, hook in first 3 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion"}.
+Return only the post content, ready to publish."""
+                    _resp = _sai.chat([{"role":"user","content":_prompt}])
+                    _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, _ctype, None)
+                    _generated.append({"platform":_plt,"day":None,"content":_resp,"id":_sid_val,"released":True})
+
+            st.session_state["studio_generated"] = _generated
+            st.session_state["studio_cost_paid"] = _cost
+            st.rerun()
+
+    # ── Show just-generated content ───────────────────────────────────────────
+    if st.session_state.get("studio_generated"):
+        st.divider()
+        st.success(f"✅ Content generated! {st.session_state.get('studio_cost_paid',0)} coins used.")
+        for _item in st.session_state["studio_generated"]:
+            _lbl = f"📱 {_item['platform']}" + (f" — {_item['day']}" if _item.get('day') else "")
+            if _item.get("released", True):
+                with st.expander(_lbl, expanded=True):
+                    st.markdown(_item["content"])
+                    st.caption(f"ID #{_item['id']} · saved to your schedule")
+            else:
+                st.info(f"🔒 {_lbl} — scheduled, unlocks on its release date")
+
+    st.divider()
+
+    # ── Content Schedule (Mon–Sun viewer) ─────────────────────────────────────
+    st.markdown("### 📅 Your Content Schedule")
+    _all_content = studio_list(_studio_sid)
+
+    if not _all_content:
+        st.caption("No content generated yet. Use the generator above to create your first post.")
+    else:
+        _day_order = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","—"]
+        _by_day = {}
+        for _c in _all_content:
+            if _c["scheduled_for"]:
+                try:
+                    _wd = _dt.fromisoformat(_c["scheduled_for"]).strftime("%A")
+                except Exception:
+                    _wd = "—"
+            else:
+                _wd = "—"
+            _by_day.setdefault(_wd, []).append(_c)
+
+        for _day in _day_order:
+            if _day not in _by_day:
+                continue
+            st.markdown(f"**{_day}**")
+            for _c in _by_day[_day]:
+                _plat_icon = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵","Instagram":"📸","Reddit":"👽"}.get(_c["platform"],"📱")
+                if not _c["released"]:
+                    st.markdown(f"{_plat_icon} **{_c['platform']}** 🔒 *Unlocks {_c['scheduled_for']}*")
+                else:
+                    with st.expander(f"{_plat_icon} {_c['platform']} · {_c['tone']} · {_c['content_type']}", expanded=False):
+                        # editable text
+                        _edit_key = f"edit_{_c['id']}"
+                        _edited = st.text_area("Content", value=_c["content"], key=_edit_key, height=120)
+                        _ecol1, _ecol2 = st.columns(2)
+                        with _ecol1:
+                            if st.button(f"💾 Save Edit (2 coins)", key=f"save_{_c['id']}"):
+                                if _studio_bal < 2:
+                                    st.error("Not enough coins to save edit.")
+                                elif _edited.strip() == _c["content"].strip():
+                                    st.warning("No changes detected.")
+                                else:
+                                    _sdb.coin_spend(_studio_sid, 2)
+                                    studio_update(_c["id"], _edited.strip())
+                                    st.success("✅ Saved!")
+                                    st.rerun()
+                        with _ecol2:
+                            if st.button(f"🗑 Delete", key=f"del_{_c['id']}"):
+                                studio_delete(_c["id"])
+                                st.rerun()
+
+
 with tab_coins:
     try:
         import uuid as _uuid
