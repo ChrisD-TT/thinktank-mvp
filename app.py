@@ -850,12 +850,18 @@ with tab_studio:
     # ── Generator ─────────────────────────────────────────────────────────────
     st.markdown("### ✍️ Generate Content")
 
+    # ── What each plan unlocks ────────────────────────────────────────────────
+    # Studio Starter ($15)  → Single posts, TikTok scripts, hashtag packs
+    # Studio Pro ($65)      → All above + Post+Hook combos, 3-coin edits
+    # Studio Week 1 ($200)  → Full week content, up to 3 platforms
+    # Studio 2-Week ($425)  → Full week all 8 platforms, 2 weeks, free edits
+    # Studio Max ($700)     → All of the above, 700 coins, permanent free edits
     _gen_type = st.selectbox("Content Type", [
-        "Single Post (7 coins)",
-        "Post + Hashtags + Hook (12 coins per platform)",
-        "TikTok / Reel Script (18 coins)",
-        "Full Week — 1 Platform (70 coins)",
-        "Full Week — ALL Platforms (850 coins)",
+        "🎯 Single Post — 7 coins  ·  Studio Starter+",
+        "🪝 Post + Hashtags + Hook — 12 coins/platform  ·  Studio Pro+",
+        "🎬 TikTok / Reel Script — 18 coins  ·  Studio Starter+",
+        "📅 Full Week — 1 Platform — 70 coins  ·  Studio Week 1+",
+        "🚀 Full Week — ALL Platforms — 850 coins  ·  Studio 2-Week+",
     ], key="studio_gen_type")
 
     # platform selector
@@ -1253,18 +1259,28 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
                             st.error("Enter a topic first.")
                         else:
                             import thinktank.engine.ai as _hai
-                            _hook_prompt = f"""Generate 5 different scroll-stopping hooks for a {_hook_platform} {_hook_tone.lower()} post/video about: {_hook_topic}
+                            _hook_prompt = f"""You are a viral content psychologist. Your job is to engineer the exact moment someone STOPS SCROLLING.
 
-Each hook must grab attention in the FIRST 2-3 SECONDS when read or heard.
-Mix these 5 styles — one of each:
-1. Bold claim / controversial statement
-2. Curiosity gap ("Here's what nobody tells you about...")
-3. Direct question that challenges an assumption
-4. Micro-story opener (first sentence of a story)
-5. Specific surprising number or fact
+Platform: {_hook_platform}
+Tone: {_hook_tone}
+Topic: {_hook_topic}
 
-Be specific to this exact topic. Generic hooks like "Have you ever wondered..." are banned.
-Format: numbered list 1-5, one hook per line. Return only the hooks."""
+Generate 5 hooks that exploit human psychology. Each hook is the FIRST LINE the audience reads or hears — it decides everything.
+
+The 5 psychological triggers to use (one per hook):
+1. **Pattern Interrupt** — violate an expectation, challenge a sacred cow, flip a common belief on its head
+2. **Curiosity Gap** — open a loop the brain MUST close ("The reason nobody talks about X is..." / "I did X for 30 days and...")
+3. **Immediate Relatability** — "If you've ever felt [specific pain], this is why..." Make them feel SEEN instantly
+4. **Shock Value / Numbers** — a number so surprising it doesn't compute ("I made $X in Y" / "X% of people don't know...")
+5. **Story Drop-In** — Start mid-action, mid-conflict, mid-emotion ("I was 10 seconds away from..." / "The call came at 2 AM and...")
+
+Rules:
+- Be radically specific to THIS topic — generic hooks fail
+- No clichés: "Have you ever wondered" / "What if I told you" / "This one trick" are dead
+- Trigger emotion fast: fear, curiosity, FOMO, validation, surprise
+- Make every word earn its place — no filler
+
+Return numbered hooks 1-5, ready to use."""
                             with st.spinner("Generating hooks..."):
                                 _hook_result = _hai.chat([
                                     {"role": "system", "content": _STUDIO_SYS},
@@ -1307,22 +1323,27 @@ Format: numbered list 1-5, one hook per line. Return only the hooks."""
                         else:
                             import thinktank.engine.ai as _rai
                             _plat_list = ", ".join(_repurpose_platforms)
-                            _repurpose_prompt = f"""Repurpose the following content into {_repurpose_tone.lower()}-tone versions for: {_plat_list}
+                            _repurpose_prompt = f"""You are a content transformation specialist. Your job is not to translate — it's to REIMAGINE this content for each platform's culture, psychology, and audience behaviour.
 
-ORIGINAL:
+Tone: {_repurpose_tone}
+Platforms: {_plat_list}
+
+ORIGINAL CONTENT:
 {_repurpose_src}
 
-Platform rules to follow exactly:
-- Twitter/X: Under 280 chars. One sharp idea. Punchy, direct. No corporate speak.
-- LinkedIn: 150-300 words. Bold opener. Whitespace between paragraphs. End with CTA or question.
-- TikTok Script: Spoken word. HOOK line first. Short sentences. Hook → value → CTA. 45-60 sec read.
-- Instagram Caption: Emotion first. Line breaks for breathing room. Hashtags on LAST line only.
-- Facebook: Warm, community feel. 100-200 words. Ask a question. Story, not broadcast.
-- YouTube Description: What viewer gets up front. Keywords in first 2 sentences. CTA at end.
-- Threads: Raw, personal, under 500 chars. Like a text to a friend.
-- Reddit: Pure value, zero promo tone. Conversational. Community first.
+For each platform, don't just reformat — extract the CORE IDEA and rebuild it from scratch using that platform's native language. Ask yourself: "What would a top creator on this platform say about this same idea?"
 
-Format each version with "## [Platform]" as a header. Return all versions, ready to copy-paste."""
+Platform transformation rules:
+- **Twitter/X**: Strip to the bone. One insight, max 280 chars. Sound like a person, not a brand. Opinions > announcements.
+- **LinkedIn**: Lead with a career or business insight. Use line breaks. Start with a hook sentence. End with a question that makes professionals think. No hashtag spam.
+- **TikTok Script**: Write for the ear, not the eye. Hook in line 1 (spoken out loud it must stop scrolling). Short punchy sentences. Rhythm matters — read it aloud. 45-60 seconds.
+- **Instagram Caption**: Open with one emotion-hitting line. Use whitespace. Tell a micro-story. Hashtags ONLY on the final line, grouped.
+- **Facebook**: Warmth and community. Share something that makes people feel less alone. Ask a real question at the end. 100-200 words.
+- **YouTube Description**: Open with the viewer's benefit ("In this video you'll learn..."). Pack keywords naturally into first 2 lines. Include [timestamp] placeholders. CTA at end.
+- **Threads**: Raw thoughts, no polish. Under 500 chars. Like you're thinking out loud to people who get it.
+- **Reddit**: Provide genuine value with zero promotional energy. Be humble, be helpful, be specific. If it sounds like marketing, start over.
+
+Format each with "## [Platform]" as a header. Every version must feel native — like it was written FOR that platform, not adapted TO it."""
                             with st.spinner(f"Repurposing for {len(_repurpose_platforms)} platforms..."):
                                 _repurpose_result = _rai.chat([
                                     {"role": "system", "content": _STUDIO_SYS},
@@ -1349,7 +1370,7 @@ Format each version with "## [Platform]" as a header. Return all versions, ready
                 with _tool_tab3:
                     st.markdown("**Your Brand Voice Profile** — so every future post sounds like YOU, not generic AI.")
                     _bv_name     = st.text_input("Your name / brand name", key="bv_name",
-                                                  placeholder="e.g. Shamar Williams / ThinkTank")
+                                                  placeholder="e.g. Stellarick / ThinkTank")
                     _bv_niche    = st.text_input("Your niche / industry", key="bv_niche",
                                                   placeholder="e.g. Entrepreneur, Music Producer, Fitness Coach")
                     _bv_audience = st.text_input("Your target audience", key="bv_audience",
@@ -1365,35 +1386,39 @@ Format each version with "## [Platform]" as a header. Return all versions, ready
                             st.error("Enter your name and niche at minimum.")
                         else:
                             import thinktank.engine.ai as _bai
-                            _bv_prompt = f"""Build a complete, specific Brand Voice Profile for:
+                            _bv_prompt = f"""You are a brand identity architect and voice coach. You help creators and entrepreneurs sound unmistakably like themselves — not like a template.
 
+CREATOR INFO:
 Name/Brand: {_bv_name}
 Niche: {_bv_niche}
 Audience: {_bv_audience or "not specified"}
-Vibe words: {_bv_words or "not specified"}
-{"Sample content from this creator:\n" + _bv_examples if _bv_examples.strip() else ""}
+Energy/Vibe: {_bv_words or "not specified"}
+{"Their actual writing samples:\n" + _bv_examples if _bv_examples.strip() else "No samples provided — infer from their niche and vibe."}
 
-Create a Brand Voice Profile with these exact sections:
+Your job: Build a Brand Voice Profile so detailed and specific that ANY piece of content generated from it sounds like it could ONLY come from {_bv_name}. Not "a professional." Not "an entrepreneur." THEM.
 
-## 🎙️ Brand Voice Summary
-2-3 sentences. What does this voice sound like? What makes it unmistakably theirs?
+## 🎙️ Brand Voice DNA
+3 sentences max. Capture the essence — the feeling someone gets reading their content. What emotion does it trigger? What world does it invite people into?
 
-## ✅ Do Use — 10 Specific Rules
-Concrete rules: sentence starters they use, formatting habits, specific word choices, tones, energy levels. Not generic like "be authentic" — specific like "start sentences with 'Here's the truth:'"
+## ✅ 10 Voice Rules — Specific, Not Generic
+These must be operational instructions, not vibes. Bad: "Be authentic." Good: "Start with the word 'Look,' when making a strong point. End posts with a single-sentence gut punch. Use em-dashes — like this — to add weight mid-sentence."
+Write 10 rules like that.
 
-## ❌ Never Do — 5 Anti-Patterns
-Specific phrases, tones, or structures that would sound completely off-brand for this person.
+## ❌ 5 Things That Kill This Voice
+Specific phrases, sentence structures, or tones that would make this brand sound like everyone else. Not "avoid jargon" — name the ACTUAL jargon.
 
-## 💬 5 Signature Phrases
-Ready-to-use phrases or sentence templates that sound uniquely like them. These should feel native to their voice.
+## 💬 10 Signature Phrases & Sentence Starters
+Ready-to-steal phrase templates that feel native to this voice. Include sentence starters, closers, and mid-post pivots. These should feel like something only {_bv_name} would say.
 
-## 📱 Platform Adaptations
-How to express this same voice differently on Twitter/X, LinkedIn, TikTok, and Instagram. Same person, different energy per platform.
+## 📱 Platform Personalities
+How {_bv_name}'s voice shifts — not changes — across:
+- **Twitter/X**: same person, sharper edge
+- **LinkedIn**: same person, earned authority tone
+- **TikTok**: same person, speaking out loud to a crowd
+- **Instagram**: same person, more visual/emotional storytelling
 
-## 🚀 Reusable AI Prompt Template
-A fill-in-the-blank prompt they can paste into any AI tool to generate on-brand content instantly. Include [TOPIC], [PLATFORM], and [TONE] placeholders.
-
-Be specific, not generic. Every rule and phrase should only make sense for THIS person."""
+## 🚀 Your Master AI Content Prompt
+A single reusable prompt they paste into any AI tool to generate on-brand content every time. Must include [TOPIC], [PLATFORM], [TONE], and embed their voice instructions directly. This prompt should make AI output sound like {_bv_name}, not a robot."""
                             with st.spinner("Building your Brand Voice Profile..."):
                                 _bv_result = _bai.chat([
                                     {"role": "system", "content": _STUDIO_SYS},
