@@ -850,18 +850,12 @@ with tab_studio:
     # ── Generator ─────────────────────────────────────────────────────────────
     st.markdown("### ✍️ Generate Content")
 
-    # ── What each plan unlocks ────────────────────────────────────────────────
-    # Studio Starter ($15)  → Single posts, TikTok scripts, hashtag packs
-    # Studio Pro ($65)      → All above + Post+Hook combos, 3-coin edits
-    # Studio Week 1 ($200)  → Full week content, up to 3 platforms
-    # Studio 2-Week ($425)  → Full week all 8 platforms, 2 weeks, free edits
-    # Studio Max ($700)     → All of the above, 700 coins, permanent free edits
     _gen_type = st.selectbox("Content Type", [
-        "🎯 Single Post — 7 coins  ·  Studio Starter+",
-        "🪝 Post + Hashtags + Hook — 12 coins/platform  ·  Studio Pro+",
-        "🎬 TikTok / Reel Script — 18 coins  ·  Studio Starter+",
-        "📅 Full Week — 1 Platform — 70 coins  ·  Studio Week 1+",
-        "🚀 Full Week — ALL Platforms — 850 coins  ·  Studio 2-Week+",
+        "🎯 Single Post  —  7 coins",
+        "🪝 Post + Hashtags + Hook  —  12 coins per platform",
+        "🎬 TikTok / Reel Script  —  18 coins",
+        "📅 Full Week — 1 Platform  —  70 coins",
+        "🚀 Full Week — ALL Platforms  —  850 coins",
     ], key="studio_gen_type")
 
     # platform selector
