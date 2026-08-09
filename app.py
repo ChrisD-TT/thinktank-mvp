@@ -357,7 +357,7 @@ with st.sidebar:
 
     st.divider()
     import urllib.parse as _sp
-    _share_url  = "https://web-production-69268.up.railway.app"
+    _share_url  = "https://www.thinktankapp.net"
     _share_text = "Just tried ThinkTank — an AI-powered decision engine that helps you think faster and take action with less risk. Check it out"
     _tw = "https://twitter.com/intent/tweet?text=" + _sp.quote(_share_text) + "&url=" + _sp.quote(_share_url)
     _li = "https://www.linkedin.com/sharing/share-offsite/?url=" + _sp.quote(_share_url)
@@ -1057,7 +1057,7 @@ with tab_coins:
             # Strip any non-ASCII / whitespace characters that may have crept in
             api_key   = api_key.encode("ascii",   errors="ignore").decode("ascii").strip()
             price_id  = price_id.encode("ascii",  errors="ignore").decode("ascii").strip()
-            base = "https://web-production-69268.up.railway.app"
+            base = "https://www.thinktankapp.net"
             body = _uparse.urlencode({
                 "mode": "payment",
                 "line_items[0][price]": price_id,
@@ -1174,6 +1174,12 @@ with tab_coins:
 
         # show login gate if not logged in
         if st.session_state.get("show_login_gate"):
+            # auto-scroll to login form
+            st.markdown(
+                '<div id="login-gate-anchor"></div>'
+                '<script>document.getElementById("login-gate-anchor").scrollIntoView({behavior:"smooth"});</script>',
+                unsafe_allow_html=True
+            )
             st.warning("🔑 **Create a free account before purchasing** — so your coins are never lost if you switch browsers or devices.")
             with st.expander("Log in or Register to continue", expanded=True):
                 _gt = st.radio("", ["Log in", "Register"], horizontal=True, key="gate_auth_mode", label_visibility="collapsed")
