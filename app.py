@@ -229,6 +229,42 @@ def _render_bounce(d):
 # ── Init ──────────────────────────────────────────────────────────────────────
 init_db()
 
+# ── GDPR / CCPA Consent Banner ────────────────────────────────────────────────
+# Shown once per browser session until accepted. Stored in session_state only —
+# no tracking cookie needed since Streamlit is server-side.
+if "consent_given" not in st.session_state:
+    st.session_state.consent_given = False
+
+if not st.session_state.consent_given:
+    _cb = st.container()
+    with _cb:
+        st.markdown(
+            """
+            <div style="
+                position:fixed;bottom:0;left:0;right:0;z-index:9999;
+                background:#1a1a2e;border-top:2px solid #3b82d4;
+                padding:14px 24px;display:flex;align-items:center;
+                justify-content:space-between;flex-wrap:wrap;gap:10px;
+            ">
+                <span style="color:#e0e0e0;font-size:0.85rem;max-width:780px;line-height:1.5;">
+                    🍪 ThinkTank collects your email and usage data to run your account and improve the service.
+                    We do not sell your data. Payments are handled by Stripe.
+                    By continuing you agree to our
+                    <a href="?page=legal" style="color:#60a5fa;">Terms of Service</a> and
+                    <a href="?page=legal" style="color:#60a5fa;">Privacy Policy</a>.
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        # Spacer so the fixed banner doesn't cover page content
+        st.markdown("<div style='height:60px'></div>", unsafe_allow_html=True)
+        _accept_col, _ = st.columns([1, 4])
+        with _accept_col:
+            if st.button("✅ Got it, I agree", type="primary", use_container_width=True, key="consent_btn"):
+                st.session_state.consent_given = True
+                st.rerun()
+
 # ── Session state ─────────────────────────────────────────────────────────────
 for k, v in {
     "selected_idea_id":    None,
