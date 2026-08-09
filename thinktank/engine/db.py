@@ -84,6 +84,14 @@ CREATE TABLE IF NOT EXISTS studio_content (
     released     INTEGER NOT NULL DEFAULT 0,
     created_at   TEXT    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS tool_sessions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT    NOT NULL,
+    minutes    INTEGER NOT NULL,
+    coins_paid INTEGER NOT NULL,
+    started_at TEXT    NOT NULL
+);
 """
 
 
@@ -578,4 +586,62 @@ def _studio_row(r) -> dict:
         "id": r[0], "platform": r[1], "topic": r[2], "tone": r[3],
         "content": r[4], "content_type": r[5], "scheduled_for": r[6],
         "released": bool(r[7]), "created_at": r[8],
+    }
+
+
+# ── Power Tool Sessions & Loyalty ─────────────────────────────────────────────
+
+_LOYALTY_WINDOW_DAYS = 7    # rolling window
+_LOYALTY_TRIGGER     = 5    # sessions needed for discount
+_LOYALTY_DISCOUNT    = 0.10 # 10% off
+
+
+def tool_session_record(session_id: str, minutes: int, coins_paid: int) -> None:
+    """Record a completed power tool session for loyalty tracking."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "INSERT INTO tool_sessions(session_id, minutes, coins_paid, started_at) VALUES (?, ?, ?, ?)",
+            (session_id, minutes, coins_paid, _utc()),
+        )
+
+
+def tool_session_count_recent(session_id: str) -> int:
+    """Count how many tool sessions this user has started in the past 7 days."""
+    cutoff = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .__class__.fromisoformat(
+            datetime.now(timezone.utc).isoformat()
+        )
+    )
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(days=_LOYALTY_WINDOW_DAYS)).isoformat()
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT COUNT(*) FROM tool_sessions WHERE session_id=? AND started_at >= ?",
+            (session_id, since),
+        ).fetchone()
+    return row[0] if row else 0
+
+
+def tool_loyalty_discount(session_id: str) -> float:
+    """
+    Return the discount fraction (0.0 or 0.10) to apply to the next session cost.
+    The 5th+ session in a rolling 7-day window gets 10% off.
+    """
+    count = tool_session_count_recent(session_id)
+    if count >= _LOYALTY_TRIGGER - 1:   # about to start their 5th (0-indexed: 0,1,2,3 = 4 done)
+        return _LOYALTY_DISCOUNT
+    return 0.0
+
+
+def tool_loyalty_status(session_id: str) -> dict:
+    """Return loyalty progress info for display in the UI."""
+    count = tool_session_count_recent(session_id)
+    sessions_until = max(0, _LOYALTY_TRIGGER - 1 - count)
+    return {
+        "sessions_this_week": count,
+        "sessions_until_discount": sessions_until,
+        "discount_active": count >= _LOYALTY_TRIGGER - 1,
+        "discount_pct": int(_LOYALTY_DISCOUNT * 100),
     }

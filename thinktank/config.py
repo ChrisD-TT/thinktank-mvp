@@ -11,7 +11,27 @@ OLLAMA_TIMEOUT  = 300                 # seconds — increase for complex ideas
 # ── Database ──────────────────────────────────────────────────────────────────
 # Use /data volume on Railway (persistent across redeploys) or local fallback
 import os as _os
-DB_PATH = _os.environ.get("DB_PATH", "./thinktank/thinktank.sqlite")
+
+def _resolve_db_path() -> str:
+    """
+    Priority:
+    1. DB_PATH env var (set in Railway Variables tab)
+    2. DB_PATH in st.secrets (set in .streamlit/secrets.toml — deployed to Railway)
+    3. Local fallback for development
+    """
+    env_val = _os.environ.get("DB_PATH", "")
+    if env_val:
+        return env_val
+    try:
+        import streamlit as _st
+        secret_val = _st.secrets.get("DB_PATH", "")
+        if secret_val:
+            return secret_val
+    except Exception:
+        pass
+    return "./thinktank/thinktank.sqlite"
+
+DB_PATH = _resolve_db_path()
 
 # ── Ask / chat memory ─────────────────────────────────────────────────────────
 ASK_MAX_TURNS = 100000                # effectively unlimited — no cap on conversations

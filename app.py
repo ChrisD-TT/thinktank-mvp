@@ -1096,6 +1096,7 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
         "tool_session_end":       0.0,
         "tool_session_mins":      0,
         "tool_warned":            False,
+        "tool_session_recorded":  False,  # prevents double-counting on rerun
     }.items():
         if _k not in st.session_state:
             st.session_state[_k] = _v
@@ -1321,11 +1322,25 @@ Be specific, not generic. Every rule and phrase should only make sense for THIS 
 
         # ── No active session — show session picker ───────────────────────────
         if not st.session_state.tool_session_active or _tool_seconds_left() <= 0:
+
+            # load loyalty status
+            from thinktank.engine.db import tool_loyalty_status, tool_loyalty_discount, tool_session_record
+            _loyalty = tool_loyalty_status(_studio_sid)
+
+            # loyalty badge
+            if _loyalty["discount_active"]:
+                st.success(f"🎉 **Power User discount active!** You get **{_loyalty['discount_pct']}% off** your next session — you've used the tools {_loyalty['sessions_this_week']} times this week.")
+            elif _loyalty["sessions_this_week"] > 0:
+                _remaining = _loyalty["sessions_until_discount"]
+                st.info(f"⚡ **{_loyalty['sessions_this_week']} sessions this week** — {_remaining} more session{'s' if _remaining != 1 else ''} to unlock your **{_loyalty['discount_pct']}% loyalty discount**!")
+
             st.markdown(
                 "**Creator Power Tools** give you timed studio access — like renting professional equipment. "
                 "Pick a session length, spend your coins, and the tools unlock for that window."
             )
             st.caption("⏱️ Your timer only runs while this tab is open. Coins are spent when you start the session.")
+
+            _loyalty_disc = tool_loyalty_discount(_studio_sid)
 
             _session_cols = st.columns(2)
             _session_items = list(_TOOL_SESSIONS.items())
@@ -1333,21 +1348,28 @@ Be specific, not generic. Every rule and phrase should only make sense for THIS 
                 with _session_cols[_si % 2]:
                     with st.container(border=True):
                         _sm, _sc = _sdata["minutes"], _sdata["coins"]
+                        # apply loyalty discount if earned
+                        _sc_final = max(1, round(_sc * (1 - _loyalty_disc)))
+                        _disc_label = f" ~~{_sc}~~ **{_sc_final}** coins 🎉 10% off" if _loyalty_disc > 0 else f"**{_sc_final} coins**"
                         st.markdown(f"### ⏱️ {_sm} Minutes")
-                        st.markdown(f"**{_sc} coins** · ~${_sc * 0.20:.0f} value")
-                        _per_min = round(_sc / _sm, 1)
+                        st.markdown(f"{_disc_label} · ~${_sc_final * 0.20:.0f} value")
+                        _per_min = round(_sc_final / _sm, 1)
                         st.caption(f"{_per_min} coins/min · {'Best value' if _sm >= 45 else 'Quick session'}")
                         if st.button(f"Unlock {_sm} min", key=f"start_session_{_sm}", type="primary", use_container_width=True):
-                            if _studio_bal < _sc:
-                                st.error(f"💰 Need {_sc} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
+                            if _studio_bal < _sc_final:
+                                st.error(f"💰 Need {_sc_final} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
                             else:
-                                _sdb.coin_spend(_studio_sid, _sc)
+                                _sdb.coin_spend(_studio_sid, _sc_final)
+                                # record session for loyalty tracking
+                                tool_session_record(_studio_sid, _sm, _sc_final)
                                 _now = _time.time()
-                                st.session_state.tool_session_active = True
-                                st.session_state.tool_session_start  = _now
-                                st.session_state.tool_session_end    = _now + (_sm * 60)
-                                st.session_state.tool_session_mins   = _sm
-                                st.session_state.tool_warned         = False
+                                st.session_state.tool_session_active   = True
+                                st.session_state.tool_session_start    = _now
+                                st.session_state.tool_session_end      = _now + (_sm * 60)
+                                st.session_state.tool_session_mins     = _sm
+                                st.session_state.tool_warned           = False
+                                st.session_state.tool_session_recorded = True
+                                # preserve any work from prior session in state — don't clear
                                 st.rerun()
 
 
@@ -1725,6 +1747,43 @@ with tab_admin:
             else:
                 st.warning(f"⚠️ {msg}")
                 st.code(f"ollama serve\nollama pull {cfg.OLLAMA_MODEL}", language="bash")
+
+    st.divider()
+
+    # ── Database Health Check ─────────────────────────────────────────────────
+    st.markdown("### 🗄️ Database Health")
+    from thinktank.config import DB_PATH as _ADMIN_DB_PATH
+    import os as _admin_os
+
+    _db_col1, _db_col2 = st.columns(2)
+    with _db_col1:
+        with st.container(border=True):
+            st.markdown("**Active DB Path**")
+            st.code(_ADMIN_DB_PATH)
+            _on_volume = _ADMIN_DB_PATH.startswith("/data")
+            if _on_volume:
+                st.success("✅ Pointing at Railway persistent volume `/data`")
+            else:
+                st.error("❌ NOT on volume — pointing at container disk. Accounts will wipe on redeploy!")
+            if _admin_os.path.exists(_ADMIN_DB_PATH):
+                _db_size = _admin_os.path.getsize(_ADMIN_DB_PATH)
+                st.caption(f"File exists · {_db_size:,} bytes")
+            else:
+                st.warning("⚠️ DB file does not exist yet — will be created on first write")
+    with _db_col2:
+        with st.container(border=True):
+            st.markdown("**Resolution chain**")
+            import os as _o2
+            _env_val    = _o2.environ.get("DB_PATH", "")
+            _secret_val = ""
+            try:
+                _secret_val = st.secrets.get("DB_PATH", "") or ""
+            except Exception:
+                pass
+            st.markdown(f"1. Railway env var `DB_PATH`: `{'✅ ' + _env_val if _env_val else '❌ not set'}`")
+            st.markdown(f"2. secrets.toml `DB_PATH`:    `{'✅ ' + _secret_val if _secret_val else '❌ not set'}`")
+            st.markdown(f"3. Fallback:                  `./thinktank/thinktank.sqlite`")
+            st.caption("Fix: set DB_PATH=/data/thinktank.sqlite in Railway → Variables")
 
     st.divider()
 
