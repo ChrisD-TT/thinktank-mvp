@@ -1470,6 +1470,50 @@ with tab_coins:
                     st.session_state.checkout_url   = None
                     st.session_state.checkout_error = f"Payment error: {_e}"
 
+        # ── Login gate — rendered FIRST so it's impossible to miss ───────────
+        # When a buy button is clicked while logged out, this renders at the
+        # TOP of the purchase area before the packages, forcing the user to
+        # register/login before they can scroll past to buy anything.
+        if st.session_state.get("show_login_gate"):
+            st.error("🔑 **You need a free account to purchase** — your coins are tied to your account so they're never lost.")
+            with st.container(border=True):
+                st.markdown("#### Log in or Create a Free Account")
+                _gt = st.radio("", ["Register (new)", "Log in (existing)"], horizontal=True,
+                               key="gate_auth_mode", label_visibility="collapsed")
+                _gcol1, _gcol2 = st.columns(2)
+                with _gcol1:
+                    _ge = st.text_input("Email", key="gate_email", placeholder="you@example.com")
+                with _gcol2:
+                    _gp = st.text_input("Password", key="gate_pw", type="password",
+                                        placeholder="Min 6 characters")
+                if _gt == "Register (new)":
+                    if st.button("✅ Create account & continue to payment", key="gate_register",
+                                 type="primary", use_container_width=True):
+                        _gr = user_register(_ge, _gp)
+                        if _gr["ok"]:
+                            _anon = st.session_state.get("_GLOBAL_SID", "")
+                            if _anon:
+                                user_merge_session(_gr["email"], _anon)
+                            st.session_state.auth_user = _gr["email"]
+                            st.session_state["show_login_gate"] = False
+                            st.rerun()
+                        else:
+                            st.error(_gr["error"])
+                else:
+                    if st.button("✅ Log in & continue to payment", key="gate_login",
+                                 type="primary", use_container_width=True):
+                        _gr = user_login(_ge, _gp)
+                        if _gr["ok"]:
+                            _anon = st.session_state.get("_GLOBAL_SID", "")
+                            if _anon:
+                                user_merge_session(_gr["email"], _anon)
+                            st.session_state.auth_user = _gr["email"]
+                            st.session_state["show_login_gate"] = False
+                            st.rerun()
+                        else:
+                            st.error(_gr["error"])
+            st.divider()
+
         # ── ThinkTank AI Packs ────────────────────────────────────────────────
         st.markdown("#### 🧠 ThinkTank AI Packs")
         _c1, _c2, _c3 = st.columns(3)
@@ -1508,45 +1552,6 @@ with tab_coins:
                 with _pb:
                     if st.button(f"Buy {_spkg['label']}", key=f"buy_{_spkg['id']}", type="primary", use_container_width=True):
                         _do_buy(_spkg)
-
-        # show login gate if not logged in
-        if st.session_state.get("show_login_gate"):
-            # auto-scroll to login form — components.html runs real JS
-            import streamlit.components.v1 as _components
-            _components.html(
-                "<script>window.parent.document.querySelector('[data-testid=\"stMainBlockContainer\"]')"
-                ".scrollTo({top: 99999, behavior: 'smooth'});</script>",
-                height=0,
-            )
-            st.warning("🔑 **Create a free account before purchasing** — so your coins are never lost if you switch browsers or devices.")
-            with st.expander("Log in or Register to continue", expanded=True):
-                _gt = st.radio("", ["Log in", "Register"], horizontal=True, key="gate_auth_mode", label_visibility="collapsed")
-                _ge = st.text_input("Email", key="gate_email", placeholder="you@example.com")
-                _gp = st.text_input("Password", key="gate_pw", type="password", placeholder="Min 6 characters")
-                if _gt == "Log in":
-                    if st.button("Log in & continue to payment", key="gate_login", type="primary", use_container_width=True):
-                        _gr = user_login(_ge, _gp)
-                        if _gr["ok"]:
-                            _anon = st.session_state.get("_GLOBAL_SID", "")
-                            if _anon:
-                                user_merge_session(_gr["email"], _anon)
-                            st.session_state.auth_user = _gr["email"]
-                            st.session_state["show_login_gate"] = False
-                            st.rerun()
-                        else:
-                            st.error(_gr["error"])
-                else:
-                    if st.button("Create account & continue", key="gate_register", type="primary", use_container_width=True):
-                        _gr = user_register(_ge, _gp)
-                        if _gr["ok"]:
-                            _anon = st.session_state.get("_GLOBAL_SID", "")
-                            if _anon:
-                                user_merge_session(_gr["email"], _anon)
-                            st.session_state.auth_user = _gr["email"]
-                            st.session_state["show_login_gate"] = False
-                            st.rerun()
-                        else:
-                            st.error(_gr["error"])
 
         # show checkout button or error OUTSIDE the column loop so it persists after rerun
         if st.session_state.checkout_error:
