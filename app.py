@@ -1146,24 +1146,21 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
     st.markdown("### 🔧 Creator Power Tools")
 
     # ── Timed Session constants ───────────────────────────────────────────────
-    # Each tier unlocks N minutes. Cost is in coins. 1 coin ≈ $0.20
     _TOOL_SESSIONS = {
         "10 min  —  15 coins  (~$3)":  {"minutes": 10,  "coins": 15},
         "20 min  —  25 coins  (~$5)":  {"minutes": 20,  "coins": 25},
         "45 min  —  50 coins  (~$10)": {"minutes": 45,  "coins": 50},
         "90 min  —  90 coins  (~$18)": {"minutes": 90,  "coins": 90},
     }
-    _WARN_SECS = 180   # warn when 3 minutes remain
-    _TICK_SECS = 30    # how often Streamlit auto-reruns to refresh the timer
+    _WARN_SECS = 180  # warn when 3 minutes remain
 
-    # ── Session state keys ────────────────────────────────────────────────────
+    # ── Session state defaults ────────────────────────────────────────────────
     for _k, _v in {
         "tool_session_active":    False,
-        "tool_session_start":     0.0,
         "tool_session_end":       0.0,
         "tool_session_mins":      0,
         "tool_warned":            False,
-        "tool_session_recorded":  False,  # prevents double-counting on rerun
+        "tool_session_recorded":  False,
     }.items():
         if _k not in st.session_state:
             st.session_state[_k] = _v
@@ -1179,39 +1176,42 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
     if not st.session_state.auth_user:
         st.info("🔑 Log in to access Creator Power Tools.")
     else:
+        # ── Restore session from DB on every page load / login ───────────────
+        # This is the key fix — session end time lives in DB, not session_state.
+        # If Streamlit reloads, logs out, or refreshes, the session is restored.
+        from thinktank.engine.db import tool_session_load, tool_session_save, tool_session_clear
+        if not st.session_state.tool_session_active:
+            _db_sess = tool_session_load(_studio_sid)
+            if _db_sess:
+                st.session_state.tool_session_active = True
+                st.session_state.tool_session_end    = _db_sess["end_epoch"]
+                st.session_state.tool_session_mins   = _db_sess["mins_total"]
+                st.session_state.tool_warned         = False
+
         # ── Active session display ────────────────────────────────────────────
         if st.session_state.tool_session_active:
             _secs_left = _tool_seconds_left()
 
             if _secs_left <= 0:
-                # Session expired
                 st.session_state.tool_session_active = False
                 st.session_state.tool_warned = False
+                tool_session_clear(_studio_sid)
                 st.error("⏱️ **Your Power Tools session has ended.** Select a new session below to continue.")
-                # fall through to session picker below
             else:
-                # Auto-rerun every _TICK_SECS so the timer refreshes
-                _components_loaded = False
-                try:
-                    import streamlit.components.v1 as _tc
-                    _tc.html(
-                        f"<script>setTimeout(function(){{window.parent.location.reload();}},{_TICK_SECS * 1000});</script>",
-                        height=0,
-                    )
-                    _components_loaded = True
-                except Exception:
-                    pass
-
-                # Warning banner when < 3 minutes left
+                # ── Timer display (NO full page reload — that was logging people out) ──
+                # We show the timer as a metric. It updates whenever the user
+                # interacts with the page. No automatic reload = no forced logout.
                 if _secs_left <= _WARN_SECS:
                     st.warning(
-                        f"⚠️ **{_tool_fmt(_secs_left)} remaining** in your Power Tools session. "
-                        f"Extend now to keep working without interruption."
+                        f"⚠️ **{_tool_fmt(_secs_left)} remaining** — extend now to keep working."
                     )
                     st.session_state.tool_warned = True
                 else:
                     _pct = int((_secs_left / (st.session_state.tool_session_mins * 60)) * 100)
-                    st.success(f"✅ Session active — **{_tool_fmt(_secs_left)} remaining** ({_pct}% of your time left)")
+                    st.success(
+                        f"✅ Session active — **{_tool_fmt(_secs_left)} remaining** "
+                        f"({_pct}% of your time left) · Timer pauses when you leave this tab."
+                    )
 
                 # Extend session inline
                 with st.expander("⏳ Extend my session", expanded=st.session_state.tool_warned):
@@ -1219,15 +1219,19 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
                     _ext_data = _TOOL_SESSIONS[_ext_choice]
                     _ext_cost = _ext_data["coins"]
                     _ext_mins = _ext_data["minutes"]
-                    st.caption(f"Adds **{_ext_mins} minutes** · costs **{_ext_cost} coins** · you have **{_studio_bal} coins**")
+                    st.caption(f"Adds **{_ext_mins} min** · **{_ext_cost} coins** · you have **{_studio_bal} coins**")
                     if st.button(f"⏳ Add {_ext_mins} min ({_ext_cost} coins)", key="extend_session", type="primary"):
                         if _studio_bal < _ext_cost:
                             st.error(f"💰 Need {_ext_cost} coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
                         else:
                             _sdb.coin_spend(_studio_sid, _ext_cost)
-                            st.session_state.tool_session_end += _ext_mins * 60
+                            st.session_state.tool_session_end  += _ext_mins * 60
                             st.session_state.tool_session_mins += _ext_mins
                             st.session_state.tool_warned = False
+                            # persist the new end time to DB
+                            tool_session_save(_studio_sid,
+                                              st.session_state.tool_session_end,
+                                              st.session_state.tool_session_mins)
                             st.success(f"✅ Session extended by {_ext_mins} minutes!")
                             st.rerun()
 
@@ -1453,16 +1457,16 @@ Be specific, not generic. Every rule and phrase should only make sense for THIS 
                                 st.error(f"💰 Need {_sc_final} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
                             else:
                                 _sdb.coin_spend(_studio_sid, _sc_final)
-                                # record session for loyalty tracking
                                 tool_session_record(_studio_sid, _sm, _sc_final)
-                                _now = _time.time()
+                                _now  = _time.time()
+                                _end  = _now + (_sm * 60)
+                                # save to DB FIRST — survives any reload or logout
+                                tool_session_save(_studio_sid, _end, _sm)
                                 st.session_state.tool_session_active   = True
-                                st.session_state.tool_session_start    = _now
-                                st.session_state.tool_session_end      = _now + (_sm * 60)
+                                st.session_state.tool_session_end      = _end
                                 st.session_state.tool_session_mins     = _sm
                                 st.session_state.tool_warned           = False
                                 st.session_state.tool_session_recorded = True
-                                # preserve any work from prior session in state — don't clear
                                 st.rerun()
 
 

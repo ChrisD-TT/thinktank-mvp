@@ -92,6 +92,13 @@ CREATE TABLE IF NOT EXISTS tool_sessions (
     coins_paid INTEGER NOT NULL,
     started_at TEXT    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS tool_session_state (
+    session_id  TEXT PRIMARY KEY,
+    end_epoch   REAL NOT NULL,
+    mins_total  INTEGER NOT NULL,
+    updated_at  TEXT NOT NULL
+);
 """
 
 
@@ -645,3 +652,47 @@ def tool_loyalty_status(session_id: str) -> dict:
         "discount_active": count >= _LOYALTY_TRIGGER - 1,
         "discount_pct": int(_LOYALTY_DISCOUNT * 100),
     }
+
+
+# ── Persistent Power Tool Session State ───────────────────────────────────────
+# Survives page reloads, logouts, and browser refreshes.
+
+def tool_session_save(session_id: str, end_epoch: float, mins_total: int) -> None:
+    """Upsert the active session end time to DB so it survives Streamlit reloads."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            """INSERT INTO tool_session_state(session_id, end_epoch, mins_total, updated_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(session_id) DO UPDATE SET
+                 end_epoch=excluded.end_epoch,
+                 mins_total=excluded.mins_total,
+                 updated_at=excluded.updated_at""",
+            (session_id, end_epoch, mins_total, _utc()),
+        )
+
+
+def tool_session_load(session_id: str) -> dict | None:
+    """
+    Load a persisted session for this user.
+    Returns None if no session exists or if it has already expired.
+    """
+    import time as _t
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            "SELECT end_epoch, mins_total FROM tool_session_state WHERE session_id=?",
+            (session_id,),
+        ).fetchone()
+    if not row:
+        return None
+    end_epoch, mins_total = row
+    if _t.time() >= end_epoch:
+        # expired — clean it up
+        tool_session_clear(session_id)
+        return None
+    return {"end_epoch": end_epoch, "mins_total": mins_total}
+
+
+def tool_session_clear(session_id: str) -> None:
+    """Remove a session record (on expiry or explicit end)."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute("DELETE FROM tool_session_state WHERE session_id=?", (session_id,))
