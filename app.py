@@ -1070,6 +1070,73 @@ Return ONLY the post — ready to copy-paste and publish. No explanations."""
     # ==============================================================================
     # CREATOR POWER TOOLS
     # ==============================================================================
+    # DOWNLOAD PROJECT PACKAGE
+    # ==============================================================================
+    st.divider()
+    st.markdown("### 📦 Download Your Work")
+    st.caption("Everything you've generated is saved to your account. Download it all as a text file anytime.")
+
+    if st.session_state.auth_user:
+        import importlib as _dl_il, thinktank.engine.db as _dldb
+        _dldb = _dl_il.reload(_dldb)
+        _all_power = [r for r in _dldb.studio_list(_studio_sid)
+                      if r["content_type"] in ("hook_generator", "repurpose_engine", "brand_voice_builder")]
+        _all_studio = [r for r in _dldb.studio_list(_studio_sid)
+                       if r["content_type"] in ("single_post", "post_hook", "tiktok_script", "week_post")]
+
+        _total_items = len(_all_power) + len(_all_studio)
+        if _total_items == 0:
+            st.caption("Nothing saved yet — generate some content first.")
+        else:
+            st.markdown(f"**{_total_items} saved items** ready to download — {len(_all_power)} Power Tool outputs + {len(_all_studio)} Studio posts")
+
+            # build the text bundle
+            from datetime import datetime as _dldt
+            _lines = []
+            _lines.append("=" * 60)
+            _lines.append("THINKTANK CONTENT PACKAGE")
+            _lines.append(f"Account: {st.session_state.auth_user}")
+            _lines.append(f"Generated: {_dldt.now().strftime('%B %d, %Y %I:%M %p')}")
+            _lines.append("=" * 60)
+
+            if _all_power:
+                _lines.append("\n\n── CREATOR POWER TOOLS ──────────────────────────────────")
+                for _item in _all_power:
+                    _type_label = {"hook_generator": "🪝 HOOKS", "repurpose_engine": "♻️ REPURPOSED CONTENT", "brand_voice_builder": "🎙️ BRAND VOICE PROFILE"}.get(_item["content_type"], _item["content_type"].upper())
+                    _lines.append(f"\n{_type_label}")
+                    _lines.append(f"Topic: {_item['topic']}  |  Platform: {_item['platform']}  |  Date: {_item['created_at'][:10]}")
+                    _lines.append("-" * 40)
+                    _lines.append(_item["content"])
+
+            if _all_studio:
+                _lines.append("\n\n── CONTENT STUDIO POSTS ─────────────────────────────────")
+                for _item in _all_studio:
+                    _lines.append(f"\n📱 {_item['platform'].upper()}  |  {_item['tone']}  |  {_item['created_at'][:10]}")
+                    if _item.get("scheduled_for"):
+                        _lines.append(f"Scheduled: {_item['scheduled_for']}")
+                    _lines.append("-" * 40)
+                    _lines.append(_item["content"])
+
+            _lines.append("\n\n" + "=" * 60)
+            _lines.append("Made with ThinkTank · www.thinktankapp.net")
+            _lines.append("=" * 60)
+
+            _bundle_text = "\n".join(_lines)
+            _filename = f"thinktank_content_{_dldt.now().strftime('%Y%m%d_%H%M')}.txt"
+
+            st.download_button(
+                label="📥 Download Full Content Package (.txt)",
+                data=_bundle_text.encode("utf-8"),
+                file_name=_filename,
+                mime="text/plain",
+                type="primary",
+                use_container_width=True,
+            )
+            st.caption("Your content is also permanently saved in your account — this download is just a copy you can keep locally.")
+    else:
+        st.info("🔑 Log in to download your saved content.")
+
+    # ==============================================================================
     # CREATOR POWER TOOLS — TIMED SESSION ACCESS
     # ==============================================================================
     import time as _time
@@ -1199,14 +1266,21 @@ Format: numbered list 1-5, one hook per line. Return only the hooks."""
                                     {"role": "system", "content": _STUDIO_SYS},
                                     {"role": "user",   "content": _hook_prompt},
                                 ])
-                            st.session_state["hook_result"] = _hook_result
+                            # save to DB permanently under this user's account
+                            _sdb.studio_save(_studio_sid, _hook_platform, _hook_topic,
+                                             _hook_tone, _hook_result, "hook_generator")
 
-                    if st.session_state.get("hook_result"):
-                        st.success("✅ 5 hooks ready")
-                        st.markdown("#### Your Hooks")
-                        st.markdown(st.session_state["hook_result"])
-                        if st.button("📋 Show as plain text", key="copy_hooks"):
-                            st.code(st.session_state["hook_result"])
+                    # load all saved hooks for this user from DB
+                    _saved_hooks = [r for r in _sdb.studio_list(_studio_sid)
+                                    if r["content_type"] == "hook_generator"]
+                    if _saved_hooks:
+                        st.success(f"✅ {len(_saved_hooks)} hook set(s) saved to your account")
+                        for _h in reversed(_saved_hooks):
+                            with st.expander(f"🪝 {_h['platform']} — {_h['topic'][:50]} · {_h['created_at'][:10]}", expanded=(_h == _saved_hooks[-1])):
+                                st.markdown(_h["content"])
+                                if st.button("🗑 Delete", key=f"del_hook_{_h['id']}"):
+                                    _sdb.studio_delete(_h["id"])
+                                    st.rerun()
 
                 # ── Repurpose Engine ──────────────────────────────────────────
                 with _tool_tab2:
@@ -1250,13 +1324,22 @@ Format each version with "## [Platform]" as a header. Return all versions, ready
                                     {"role": "system", "content": _STUDIO_SYS},
                                     {"role": "user",   "content": _repurpose_prompt},
                                 ])
-                            st.session_state["repurpose_result"] = _repurpose_result
-                            st.session_state["repurpose_platforms_used"] = _repurpose_platforms
+                            # save to DB permanently
+                            _sdb.studio_save(_studio_sid, ", ".join(_repurpose_platforms),
+                                             _repurpose_src[:80], _repurpose_tone,
+                                             _repurpose_result, "repurpose_engine")
 
-                    if st.session_state.get("repurpose_result"):
-                        st.success(f"✅ {len(st.session_state.get('repurpose_platforms_used', []))} platform versions ready")
-                        st.markdown("#### Repurposed Content")
-                        st.markdown(st.session_state["repurpose_result"])
+                    # load all saved repurpose outputs from DB
+                    _saved_repurpose = [r for r in _sdb.studio_list(_studio_sid)
+                                        if r["content_type"] == "repurpose_engine"]
+                    if _saved_repurpose:
+                        st.success(f"✅ {len(_saved_repurpose)} repurpose project(s) saved to your account")
+                        for _rp in reversed(_saved_repurpose):
+                            with st.expander(f"♻️ {_rp['platform']} — {_rp['topic'][:50]} · {_rp['created_at'][:10]}", expanded=(_rp == _saved_repurpose[-1])):
+                                st.markdown(_rp["content"])
+                                if st.button("🗑 Delete", key=f"del_repurpose_{_rp['id']}"):
+                                    _sdb.studio_delete(_rp["id"])
+                                    st.rerun()
 
                 # ── Brand Voice Builder ───────────────────────────────────────
                 with _tool_tab3:
@@ -1312,13 +1395,23 @@ Be specific, not generic. Every rule and phrase should only make sense for THIS 
                                     {"role": "system", "content": _STUDIO_SYS},
                                     {"role": "user",   "content": _bv_prompt},
                                 ])
-                            st.session_state["brand_voice_result"] = _bv_result
+                            # save to DB permanently
+                            _sdb.studio_save(_studio_sid, "Brand Voice",
+                                             _bv_name, _bv_words or "custom",
+                                             _bv_result, "brand_voice_builder")
 
-                    if st.session_state.get("brand_voice_result"):
-                        st.success("✅ Your Brand Voice Profile is ready")
-                        st.markdown("---")
-                        st.markdown(st.session_state["brand_voice_result"])
-                        st.info("💡 Save this — paste it as context into any AI tool and your content will always sound like you.")
+                    # load all saved brand voice profiles from DB
+                    _saved_bv = [r for r in _sdb.studio_list(_studio_sid)
+                                 if r["content_type"] == "brand_voice_builder"]
+                    if _saved_bv:
+                        st.success(f"✅ {len(_saved_bv)} Brand Voice Profile(s) saved to your account")
+                        for _bvs in reversed(_saved_bv):
+                            with st.expander(f"🎙️ {_bvs['topic']} · {_bvs['created_at'][:10]}", expanded=(_bvs == _saved_bv[-1])):
+                                st.markdown(_bvs["content"])
+                                st.info("💡 Copy this entire profile and paste it into any AI tool as your starting context.")
+                                if st.button("🗑 Delete", key=f"del_bv_{_bvs['id']}"):
+                                    _sdb.studio_delete(_bvs["id"])
+                                    st.rerun()
 
         # ── No active session — show session picker ───────────────────────────
         if not st.session_state.tool_session_active or _tool_seconds_left() <= 0:
