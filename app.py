@@ -1014,6 +1014,171 @@ Return only the post content, ready to publish."""
                                 st.rerun()
 
 
+    # ==============================================================================
+    # CREATOR POWER TOOLS
+    # ==============================================================================
+    st.divider()
+    st.markdown("### 🔧 Creator Power Tools")
+    st.caption("Advanced tools that make your content stand out. Each charges coins per use.")
+
+    _tool_tab1, _tool_tab2, _tool_tab3 = st.tabs(["🪝 Hook Generator", "♻️ Repurpose Engine", "🎙️ Brand Voice Builder"])
+
+    # ── Hook Generator (4 coins) ──────────────────────────────────────────────
+    with _tool_tab1:
+        st.markdown("**Generate 5 scroll-stopping hooks for your content** — the first 3 seconds that make people stop and watch.")
+        st.caption("Cost: **4 coins** per generation")
+        _hook_topic    = st.text_area("What is your video/post about?", key="hook_topic", height=80,
+                                       placeholder="e.g. How I built a $10k/month business in 90 days")
+        _hook_platform = st.selectbox("Platform", ["TikTok", "Instagram Reels", "YouTube Shorts", "Twitter/X", "LinkedIn"], key="hook_platform")
+        _hook_tone     = st.selectbox("Tone", _TONES, key="hook_tone")
+
+        if st.button("🪝 Generate Hooks", key="gen_hooks", type="primary", use_container_width=True):
+            if not st.session_state.auth_user:
+                st.error("🔑 Please log in first — use the sidebar.")
+            elif not _hook_topic.strip():
+                st.error("Enter a topic first.")
+            elif _studio_bal < 4:
+                st.error(f"💰 Need 4 coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
+            else:
+                _sdb.coin_spend(_studio_sid, 4)
+                import thinktank.engine.ai as _hai
+                _hook_prompt = f"""You are an expert viral content strategist.
+Generate 5 different scroll-stopping hooks for a {_hook_platform} {_hook_tone.lower()} post/video about: {_hook_topic}
+
+Rules:
+- Each hook must grab attention in the FIRST 3 SECONDS
+- Mix styles: question, bold statement, curiosity gap, controversy, story opener
+- Be specific, not generic
+- Format: numbered list 1-5, one hook per line, no explanations
+
+Return only the 5 hooks, numbered."""
+                with st.spinner("Generating hooks..."):
+                    _hook_result = _hai.chat([{"role": "user", "content": _hook_prompt}])
+                st.session_state["hook_result"] = _hook_result
+                st.session_state["hook_cost_paid"] = 4
+
+        if st.session_state.get("hook_result"):
+            st.success(f"✅ 4 coins used · 5 hooks ready")
+            st.markdown("#### Your Hooks")
+            st.markdown(st.session_state["hook_result"])
+            if st.button("📋 Copy All", key="copy_hooks"):
+                st.code(st.session_state["hook_result"])
+
+    # ── Repurpose Engine (6 coins) ────────────────────────────────────────────
+    with _tool_tab2:
+        st.markdown("**Turn 1 piece of content into versions for every platform** — write once, post everywhere.")
+        st.caption("Cost: **6 coins** per repurpose (covers all selected platforms)")
+        _repurpose_src = st.text_area("Paste your original content here", key="repurpose_src", height=150,
+                                       placeholder="Paste a blog post, tweet, video script, caption — anything.")
+        _repurpose_platforms = st.multiselect("Repurpose for these platforms",
+            ["Twitter/X", "LinkedIn", "TikTok Script", "Instagram Caption", "Facebook", "YouTube Description", "Threads", "Reddit"],
+            default=["Twitter/X", "LinkedIn", "Instagram Caption"], key="repurpose_platforms")
+        _repurpose_tone = st.selectbox("Tone", _TONES, key="repurpose_tone")
+
+        if st.button("♻️ Repurpose Content", key="gen_repurpose", type="primary", use_container_width=True):
+            if not st.session_state.auth_user:
+                st.error("🔑 Please log in first — use the sidebar.")
+            elif not _repurpose_src.strip():
+                st.error("Paste some content to repurpose.")
+            elif not _repurpose_platforms:
+                st.error("Select at least one platform.")
+            elif _studio_bal < 6:
+                st.error(f"💰 Need 6 coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
+            else:
+                _sdb.coin_spend(_studio_sid, 6)
+                import thinktank.engine.ai as _rai
+                _plat_list = ", ".join(_repurpose_platforms)
+                _repurpose_prompt = f"""You are an expert social media strategist.
+Repurpose the following content into optimized versions for these platforms: {_plat_list}
+
+ORIGINAL CONTENT:
+{_repurpose_src}
+
+Tone: {_repurpose_tone}
+
+For each platform, rewrite the content following that platform's best practices:
+- Twitter/X: Under 280 chars, punchy, no fluff
+- LinkedIn: Professional, 150-300 words, story-driven
+- TikTok Script: Hook + body + CTA, spoken word style, 60 seconds
+- Instagram Caption: Emojis, line breaks, hashtags at end
+- Facebook: Friendly, conversational, 100-200 words
+- YouTube Description: Timestamps, keywords, CTA, 200-300 words
+- Threads: Casual, under 500 chars
+- Reddit: No self-promotion tone, add value, conversational
+
+Format: Use "## [Platform Name]" as header for each section. Return all versions."""
+                with st.spinner(f"Repurposing for {len(_repurpose_platforms)} platforms..."):
+                    _repurpose_result = _rai.chat([{"role": "user", "content": _repurpose_prompt}])
+                st.session_state["repurpose_result"] = _repurpose_result
+                st.session_state["repurpose_platforms_used"] = _repurpose_platforms
+
+        if st.session_state.get("repurpose_result"):
+            st.success(f"✅ 6 coins used · {len(st.session_state.get('repurpose_platforms_used', []))} platform versions ready")
+            st.markdown("#### Repurposed Content")
+            st.markdown(st.session_state["repurpose_result"])
+
+    # ── Brand Voice Builder (8 coins) ─────────────────────────────────────────
+    with _tool_tab3:
+        st.markdown("**Define your unique brand voice** — so all future content sounds like YOU, not generic AI.")
+        st.caption("Cost: **8 coins** to generate your Brand Voice Profile")
+        _bv_name     = st.text_input("Your name / brand name", key="bv_name", placeholder="e.g. Shamar Williams / ThinkTank")
+        _bv_niche    = st.text_input("Your niche / industry", key="bv_niche", placeholder="e.g. Entrepreneur, Music Producer, Fitness Coach")
+        _bv_audience = st.text_input("Your target audience", key="bv_audience", placeholder="e.g. Young entrepreneurs, 18-35, want financial freedom")
+        _bv_examples = st.text_area("Paste 2-3 examples of your best posts (optional but recommended)", key="bv_examples",
+                                     height=120, placeholder="Paste captions, tweets, or anything you've written that sounds most like you...")
+        _bv_words    = st.text_input("3 words that describe your vibe", key="bv_words", placeholder="e.g. Bold, Authentic, Motivational")
+
+        if st.button("🎙️ Build My Brand Voice", key="gen_brand_voice", type="primary", use_container_width=True):
+            if not st.session_state.auth_user:
+                st.error("🔑 Please log in first — use the sidebar.")
+            elif not _bv_name.strip() or not _bv_niche.strip():
+                st.error("Enter your name and niche at minimum.")
+            elif _studio_bal < 8:
+                st.error(f"💰 Need 8 coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
+            else:
+                _sdb.coin_spend(_studio_sid, 8)
+                import thinktank.engine.ai as _bai
+                _bv_prompt = f"""You are a brand strategist and copywriter.
+Build a complete Brand Voice Profile for:
+
+Name/Brand: {_bv_name}
+Niche: {_bv_niche}
+Target Audience: {_bv_audience or "not specified"}
+Vibe Words: {_bv_words or "not specified"}
+{"Example Content:" + chr(10) + _bv_examples if _bv_examples.strip() else ""}
+
+Create a detailed Brand Voice Profile with these sections:
+
+## 🎙️ Brand Voice Summary
+(2-3 sentences capturing their overall voice and personality)
+
+## ✅ Do Use (10 specific rules for this brand)
+(Sentence starters, tone cues, formatting habits, word choices to always use)
+
+## ❌ Never Do (5 anti-patterns to avoid)
+(Generic phrases, tones, or styles that would kill their brand voice)
+
+## 💬 Signature Phrases
+(5 phrases or sentence structures unique to this brand — ready to use)
+
+## 📱 Platform Adaptations
+(How to adapt this voice for Twitter/X, LinkedIn, TikTok, and Instagram while staying on-brand)
+
+## 🚀 Quick-Start Prompt Template
+(A fill-in-the-blank AI prompt they can reuse to generate on-brand content every time)
+
+Make it specific, actionable, and uniquely tailored to their personality."""
+                with st.spinner("Building your Brand Voice Profile..."):
+                    _bv_result = _bai.chat([{"role": "user", "content": _bv_prompt}])
+                st.session_state["brand_voice_result"] = _bv_result
+
+        if st.session_state.get("brand_voice_result"):
+            st.success("✅ 8 coins used · Your Brand Voice Profile is ready")
+            st.markdown("---")
+            st.markdown(st.session_state["brand_voice_result"])
+            st.info("💡 Save this profile somewhere safe — paste it into any AI tool as context to make all your future content sound like you.")
+
+
 with tab_coins:
     try:
         import uuid as _uuid
@@ -1174,11 +1339,12 @@ with tab_coins:
 
         # show login gate if not logged in
         if st.session_state.get("show_login_gate"):
-            # auto-scroll to login form
-            st.markdown(
-                '<div id="login-gate-anchor"></div>'
-                '<script>document.getElementById("login-gate-anchor").scrollIntoView({behavior:"smooth"});</script>',
-                unsafe_allow_html=True
+            # auto-scroll to login form — components.html runs real JS
+            import streamlit.components.v1 as _components
+            _components.html(
+                "<script>window.parent.document.querySelector('[data-testid=\"stMainBlockContainer\"]')"
+                ".scrollTo({top: 99999, behavior: 'smooth'});</script>",
+                height=0,
             )
             st.warning("🔑 **Create a free account before purchasing** — so your coins are never lost if you switch browsers or devices.")
             with st.expander("Log in or Register to continue", expanded=True):
