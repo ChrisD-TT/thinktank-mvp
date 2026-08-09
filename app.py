@@ -824,7 +824,7 @@ with tab_studio:
     }
     _MULTI_DISC = 0.85  # 15% off when selecting multiple platforms
 
-    _PLATFORMS = ["Twitter/X", "LinkedIn", "TikTok", "Instagram", "Reddit"]
+    _PLATFORMS = ["Twitter/X", "LinkedIn", "TikTok", "Instagram", "Reddit", "Facebook", "YouTube", "Threads"]
     _TONES     = ["Professional", "Casual", "Viral", "Informative", "Bold"]
 
     _studio_sid = _auth_sid()
@@ -927,7 +927,7 @@ with tab_studio:
                         _prompt = f"""You are an expert social media strategist.
 Write a {_tone.lower()} {_plt} post for {_day} about: {_topic}
 {"Include hashtags and a hook line." if "Hashtags" in _gen_type else ""}
-Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional tone, 150-300 words" if _plt=="LinkedIn" else "Script with hook, body, CTA, 60 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion tone for Reddit"}.
+Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional tone, 150-300 words" if _plt=="LinkedIn" else "Script with hook, body, CTA, 60 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion" if _plt=="Reddit" else "Friendly and shareable, 100-200 words" if _plt=="Facebook" else "Video description with timestamps and CTA, 200-300 words" if _plt=="YouTube" else "Short casual post under 500 chars" if _plt=="Threads" else "Engaging post ready to publish"}.
 Return only the post content, ready to publish."""
                         _resp = _sai.chat([{"role":"user","content":_prompt}])
                         _sched = (_today + _td(days=_di)).isoformat() if _schedule_week else None
@@ -937,7 +937,7 @@ Return only the post content, ready to publish."""
                     _ctype = "tiktok_script" if "TikTok" in _gen_type else "post_hook" if "Hashtags" in _gen_type else "single_post"
                     _prompt = f"""You are an expert social media strategist.
 Write a {_tone.lower()} {_plt} {"post with hashtags and a compelling hook line" if "Hashtags" in _gen_type else "TikTok script with hook, body, and CTA" if "TikTok" in _gen_type else "post"} about: {_topic}
-Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional, 150-300 words" if _plt=="LinkedIn" else "60-second script, hook in first 3 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion"}.
+Platform style: {"Keep under 280 chars, punchy" if _plt=="Twitter/X" else "Professional, 150-300 words" if _plt=="LinkedIn" else "60-second script, hook in first 3 seconds" if _plt=="TikTok" else "Caption with emojis and hashtags" if _plt=="Instagram" else "Conversational, no self-promotion" if _plt=="Reddit" else "Friendly and shareable, 100-200 words" if _plt=="Facebook" else "Video description with timestamps and CTA" if _plt=="YouTube" else "Short casual post under 500 chars"}.
 Return only the post content, ready to publish."""
                     _resp = _sai.chat([{"role":"user","content":_prompt}])
                     _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, _ctype, None)
@@ -986,7 +986,7 @@ Return only the post content, ready to publish."""
                 continue
             st.markdown(f"**{_day}**")
             for _c in _by_day[_day]:
-                _plat_icon = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵","Instagram":"📸","Reddit":"👽"}.get(_c["platform"],"📱")
+                _plat_icon = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵","Instagram":"📸","Reddit":"👽","Facebook":"📘","YouTube":"▶️","Threads":"🧵"}.get(_c["platform"],"📱")
                 if not _c["released"]:
                     st.markdown(f"{_plat_icon} **{_c['platform']}** 🔒 *Unlocks {_c['scheduled_for']}*")
                 else:

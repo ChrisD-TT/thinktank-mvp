@@ -9,7 +9,9 @@ OLLAMA_MODEL    = "llama3.2"          # change to any model you have pulled
 OLLAMA_TIMEOUT  = 300                 # seconds — increase for complex ideas
 
 # ── Database ──────────────────────────────────────────────────────────────────
-DB_PATH = "./thinktank/thinktank.sqlite"
+# Use /data volume on Railway (persistent across redeploys) or local fallback
+import os as _os
+DB_PATH = _os.environ.get("DB_PATH", "./thinktank/thinktank.sqlite")
 
 # ── Ask / chat memory ─────────────────────────────────────────────────────────
 ASK_MAX_TURNS = 100000                # effectively unlimited — no cap on conversations
