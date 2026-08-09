@@ -372,8 +372,8 @@ with st.sidebar:
     st.caption("🔗 " + _share_url)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin = st.tabs(
-    ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin"]
+tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin, tab_legal = st.tabs(
+    ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin", "📄 Legal"]
 )
 
 # ==============================================================================
@@ -1991,3 +1991,223 @@ with tab_admin:
                     st.caption(row["recommended_action"])
     else:
         st.caption("No gate history yet.")
+
+# ==============================================================================
+# LEGAL TAB
+# ==============================================================================
+with tab_legal:
+    st.subheader("📄 Legal")
+    _legal_tos, _legal_pp = st.tabs(["📋 Terms of Service", "🔒 Privacy Policy"])
+
+    with _legal_tos:
+        st.markdown("""
+## Terms of Service
+
+**Effective Date:** August 1, 2025
+
+Welcome to **ThinkTank**, operated by Chris Dovico at **www.thinktankapp.net**.
+By accessing or using ThinkTank you agree to be bound by these Terms.
+If you do not agree, do not use the Service.
+
+---
+
+### 1. Acceptance
+
+By creating an account or purchasing coins you confirm you are at least 18 years old
+and accept these Terms in full.
+
+---
+
+### 2. The Service
+
+ThinkTank provides AI-assisted decision-making tools, social media content generation,
+and creator tools accessed through a virtual coin system.
+
+---
+
+### 3. Accounts
+
+You must provide a valid email to register. You are responsible for all activity
+under your account and for keeping your password confidential.
+We may terminate accounts that violate these Terms.
+
+---
+
+### 4. Coins & Payments
+
+- Coins are a virtual currency used solely within ThinkTank.
+- All purchases are processed by Stripe, our third-party payment provider.
+- **All coin purchases are final and non-refundable** except where required by law.
+- Coins carry no cash value and cannot be transferred or redeemed for money.
+- Coins do not expire while your account is active.
+- We reserve the right to adjust pricing with reasonable notice.
+
+---
+
+### 5. Timed Sessions
+
+- Creator Power Tool sessions are time-limited windows purchased with coins.
+- Coins spent on sessions are non-refundable regardless of whether the session was fully used.
+- Remaining session time is stored and can be resumed after a disconnect or logout.
+
+---
+
+### 6. AI-Generated Content
+
+- ThinkTank uses OpenAI's API to generate content.
+- AI outputs are provided **"as is"** with no guarantees of accuracy or fitness for purpose.
+- You are solely responsible for reviewing and using any AI-generated content before publishing.
+- ThinkTank is not liable for any consequences arising from use of AI-generated content.
+- You retain ownership of content you generate, subject to OpenAI's usage policies.
+
+---
+
+### 7. Acceptable Use
+
+You agree not to use ThinkTank to generate illegal, defamatory, or harmful content;
+to reverse-engineer or scrape the platform; or to resell AI outputs as your own service.
+
+---
+
+### 8. Intellectual Property
+
+ThinkTank's code, design, branding, and systems are owned by Chris Dovico and protected
+by copyright. The name "ThinkTank" and associated branding are proprietary.
+You may not copy or create derivative works without written permission.
+
+---
+
+### 9. Disclaimer of Warranties
+
+THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND.
+WE DO NOT WARRANT UNINTERRUPTED OR ERROR-FREE OPERATION.
+
+---
+
+### 10. Limitation of Liability
+
+TO THE FULLEST EXTENT PERMITTED BY LAW, THINKTANK AND ITS OPERATORS SHALL NOT
+BE LIABLE FOR ANY INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING FROM
+YOUR USE OF THE SERVICE.
+
+---
+
+### 11. Changes
+
+We may update these Terms at any time. The "Effective Date" above will reflect the
+most recent revision. Continued use constitutes acceptance.
+
+---
+
+### 12. Governing Law
+
+These Terms are governed by the laws of the United States.
+
+---
+
+### 13. Contact
+
+**support@thinktankapp.net** · www.thinktankapp.net
+        """)
+
+    with _legal_pp:
+        st.markdown("""
+## Privacy Policy
+
+**Effective Date:** August 1, 2025
+
+ThinkTank ("we," "us," "our") operates **www.thinktankapp.net**.
+This Policy explains what data we collect, how we use it, and your rights.
+
+---
+
+### 1. Information We Collect
+
+**You provide:**
+- Email address and hashed password when registering
+- Text inputs (topics, briefs, content examples) used to generate AI outputs
+
+**We collect automatically:**
+- Coin purchase and usage records tied to your account
+- AI-generated content saved to your account
+- Power Tool session records for loyalty tracking
+
+**We do not collect:**
+- Credit card numbers or billing data — all payments are handled by Stripe
+
+---
+
+### 2. How We Use Your Information
+
+- To create and manage your account
+- To process purchases and maintain your coin balance
+- To save and retrieve your generated content
+- To track session usage for loyalty discounts
+- To provide customer support and improve the Service
+
+We do **not** sell or share your personal data with third parties for marketing.
+
+---
+
+### 3. Data Storage & Security
+
+- Data is stored in a secure database on Railway's infrastructure.
+- Passwords are hashed using SHA-256 — never stored in plain text.
+- All data in transit is encrypted via HTTPS/TLS.
+
+---
+
+### 4. Third-Party Services
+
+| Service | Purpose |
+|---|---|
+| OpenAI | AI content generation |
+| Stripe | Payment processing |
+| Railway | App hosting and database |
+
+Your content inputs are sent to OpenAI's API to generate responses.
+Please review [OpenAI's Privacy Policy](https://openai.com/privacy) for details.
+Payment data is handled solely by [Stripe](https://stripe.com/privacy).
+
+---
+
+### 5. Data Retention
+
+Your data is retained while your account is active.
+To delete your account and all associated data, email **support@thinktankapp.net**.
+
+---
+
+### 6. Your Rights
+
+You may request to access, correct, or delete your personal data at any time.
+You can export your generated content using the Download button in Content Studio.
+Contact us at **support@thinktankapp.net** to exercise these rights.
+
+---
+
+### 7. Cookies
+
+ThinkTank does not use tracking or advertising cookies.
+Session management is handled server-side.
+
+---
+
+### 8. Children
+
+ThinkTank is not directed to children under 13 and we do not knowingly collect
+data from minors.
+
+---
+
+### 9. Changes
+
+We may update this Policy at any time. The "Effective Date" above reflects
+the most recent revision.
+
+---
+
+### 10. Contact
+
+**support@thinktankapp.net** · www.thinktankapp.net
+        """)
