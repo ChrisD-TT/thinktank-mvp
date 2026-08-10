@@ -932,7 +932,7 @@ with tab_studio:
         if len(platforms) > 1: base = max(1, round(base * _MULTI_DISC))
         return base
 
-    _cost = _studio_cost(_gen_type, _sel_platforms if "ALL Platforms" not in _gen_type else _PLATFORMS)
+    _cost = _studio_cost(_gen_type, _sel_platforms)
     st.markdown(f"**Cost: {_cost} coins**")
 
     if st.button("🚀 Generate Content", key="studio_generate", type="primary", use_container_width=True):
@@ -964,46 +964,47 @@ with tab_studio:
                     "Threads":    "Raw, casual, personal. Under 500 chars. Like texting your audience. No hashtags needed.",
                 }.get(plt, "Engaging, platform-appropriate post. Write for a real human audience.")
 
-            _ctype = "tiktok_script" if "TikTok" in _gen_type else "post_hook" if "Hashtags" in _gen_type else "single_post"
-            for _plt in _sel_platforms:
-                if "TikTok" in _gen_type:
-                    _prompt = (
-                        f"Write a TikTok/Reel video script about: {_topic}\n"
-                        f"Tone: {_tone}\n\n"
-                        "Structure:\n"
-                        "HOOK (first 2 seconds - must stop the scroll, spoken out loud):\n"
-                        "[write hook here]\n\n"
-                        "BODY (the value, 30-45 seconds spoken):\n"
-                        "[write body here - short sentences, rhythm, conversational]\n\n"
-                        "CTA (last 5 seconds):\n"
-                        "[write CTA here - specific action, not generic follow me]\n\n"
-                        f"Platform requirements: {_plt_style('TikTok')}\n\n"
-                        "Return ONLY the script with HOOK / BODY / CTA labels. Ready to read on camera."
-                    )
-                elif "Hashtags" in _gen_type:
-                    _prompt = (
-                        f"Write a {_tone.lower()} {_plt} post about: {_topic}\n\n"
-                        "Include:\n"
-                        "1. A HOOK line (scroll-stopping opener, labeled HOOK:)\n"
-                        "2. The full post body\n"
-                        "3. 5 targeted hashtags (labeled HASHTAGS:) on the final line\n\n"
-                        f"Platform requirements: {_plt_style(_plt)}\n\n"
-                        "Return ONLY the hook, post, and hashtags - ready to publish."
-                    )
-                else:
-                    _prompt = (
-                        f"Write a {_tone.lower()} {_plt} post about: {_topic}\n\n"
-                        f"Platform requirements: {_plt_style(_plt)}\n\n"
-                        "Return ONLY the post - ready to copy-paste and publish. No explanations."
-                    )
-                _resp = _sai.chat([
-                    {"role": "system", "content": _STUDIO_SYS},
-                    {"role": "user",   "content": _prompt},
-                ])
-                _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, _ctype, None)
-                _generated.append({"platform": _plt, "day": None, "content": _resp, "id": _sid_val, "released": True})
-
-            st.session_state["studio_generated"] = _generated
+            with st.spinner("🔄 Generating your content... this can take 15-30 seconds. Hang tight!"):
+                _ctype = "tiktok_script" if "TikTok" in _gen_type else "post_hook" if "Hashtags" in _gen_type else "single_post"
+                for _plt in _sel_platforms:
+                    if "TikTok" in _gen_type:
+                        _prompt = (
+                            f"Write a TikTok/Reel video script about: {_topic}\n"
+                            f"Tone: {_tone}\n\n"
+                            "Structure:\n"
+                            "HOOK (first 2 seconds - must stop the scroll, spoken out loud):\n"
+                            "[write hook here]\n\n"
+                            "BODY (the value, 30-45 seconds spoken):\n"
+                            "[write body here - short sentences, rhythm, conversational]\n\n"
+                            "CTA (last 5 seconds):\n"
+                            "[write CTA here - specific action, not generic follow me]\n\n"
+                            f"Platform requirements: {_plt_style('TikTok')}\n\n"
+                            "Return ONLY the script with HOOK / BODY / CTA labels. Ready to read on camera."
+                        )
+                    elif "Hashtags" in _gen_type:
+                        _prompt = (
+                            f"Write a {_tone.lower()} {_plt} post about: {_topic}\n\n"
+                            "Include:\n"
+                            "1. A HOOK line (scroll-stopping opener, labeled HOOK:)\n"
+                            "2. The full post body\n"
+                            "3. 5 targeted hashtags (labeled HASHTAGS:) on the final line\n\n"
+                            f"Platform requirements: {_plt_style(_plt)}\n\n"
+                            "Return ONLY the hook, post, and hashtags - ready to publish."
+                        )
+                    else:
+                        _prompt = (
+                            f"Write a {_tone.lower()} {_plt} post about: {_topic}\n\n"
+                            f"Platform requirements: {_plt_style(_plt)}\n\n"
+                            "Return ONLY the post - ready to copy-paste and publish. No explanations."
+                        )
+                    _resp = _sai.chat([
+                        {"role": "system", "content": _STUDIO_SYS},
+                        {"role": "user",   "content": _prompt},
+                    ])
+                    _sid_val = _sdb.studio_save(_studio_sid, _plt, _topic, _tone, _resp, _ctype, None)
+                    _generated.append({"platform": _plt, "day": None, "content": _resp, "id": _sid_val, "released": True})
+    
+                st.session_state["studio_generated"] = _generated
             st.session_state["studio_cost_paid"] = _cost
             st.rerun()
 
@@ -2036,7 +2037,7 @@ with tab_legal:
         st.markdown("""
 ## Terms of Service
 
-**Effective Date:** August 1, 2025
+**Effective Date:** August 9, 2026
 
 Welcome to **ThinkTank**, operated by Chris Dovico at **www.thinktankapp.net**.
 By accessing or using ThinkTank you agree to be bound by these Terms.
@@ -2147,7 +2148,7 @@ These Terms are governed by the laws of the United States.
         st.markdown("""
 ## Privacy Policy
 
-**Effective Date:** August 1, 2025
+**Effective Date:** August 9, 2026
 
 ThinkTank ("we," "us," "our") operates **www.thinktankapp.net**.
 This Policy explains what data we collect, how we use it, and your rights.
