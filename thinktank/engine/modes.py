@@ -236,7 +236,7 @@ def run_ask(question: str, chat_id: int) -> str:
 
     messages.append({"role": "user", "content": question})
 
-    response = ai.chat(messages)
+    response = ai.ask_chat(messages)
 
     db.chat_add_message(chat_id, "user",      question)
     db.chat_add_message(chat_id, "assistant", response)

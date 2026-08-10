@@ -13,7 +13,8 @@ import urllib.request
 from thinktank.config import OLLAMA_BASE_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT
 
 
-OPENAI_MODEL   = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL     = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_ASK_MODEL = os.environ.get("OPENAI_ASK_MODEL", "gpt-4o")  # full model for Ask/chat
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 
@@ -33,12 +34,13 @@ def _get_openai_key() -> str:
 
 
 # ── OpenAI ────────────────────────────────────────────────────────────────────
-def _openai_chat(messages: list[dict]) -> str:
+def _openai_chat(messages: list[dict], temperature: float = 1.0) -> str:
     api_key = _get_openai_key().strip()
     payload = json.dumps({
         "model":      OPENAI_MODEL,
         "messages":   messages,
         "max_tokens": 2048,
+        "temperature": temperature,
     }).encode("utf-8")
     req = urllib.request.Request(
         OPENAI_API_URL,
@@ -68,8 +70,38 @@ def _ollama_chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str:
     return result["message"]["content"].strip()
 
 
+# ── Ask-specific chat (uses gpt-4o at higher creativity) ────────────────────
+def ask_chat(messages: list[dict]) -> str:
+    """High-intelligence chat for the Ask tab. Uses gpt-4o at temp 1.2."""
+    openai_key = _get_openai_key()
+    if openai_key:
+        api_key = openai_key.strip()
+        payload = json.dumps({
+            "model":       OPENAI_ASK_MODEL,
+            "messages":    messages,
+            "max_tokens":  4096,
+            "temperature": 1.2,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            OPENAI_API_URL,
+            data=payload,
+            headers={
+                "Content-Type":  "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+            return result["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass  # fall through to standard chat
+    return chat(messages)
+
+
 # ── Public interface ──────────────────────────────────────────────────────────
-def chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str:
+def chat(messages: list[dict], model: str = OLLAMA_MODEL, temperature: float = 1.0) -> str:
     """
     Send messages and return the reply text.
     Uses OpenAI → Ollama in priority order.
@@ -78,7 +110,7 @@ def chat(messages: list[dict], model: str = OLLAMA_MODEL) -> str:
     openai_key = _get_openai_key()
     if openai_key:
         try:
-            return _openai_chat(messages)
+            return _openai_chat(messages, temperature=temperature)
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="ignore")
             raise OllamaError(f"OpenAI API error {e.code}: {body}")
