@@ -1,4 +1,4 @@
-﻿"""
+"""
 ThinkTank — Streamlit UI entry point.
 Run: streamlit run app.py
 """
@@ -818,6 +818,7 @@ with tab_ask:
 
     ask_text = st.text_area("Ask something", height=120, key="ask_input",
                             placeholder="Ask ThinkTank anything…")
+    st.caption("🧠 Uses **AI coins** (1 per message). Studio coins are separate — used only in Content Studio.")
     a1, a2, a3 = st.columns(3)
 
     with a1:

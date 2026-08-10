@@ -1,4 +1,4 @@
-﻿"""
+"""
 ThinkTank — SQLite persistence layer.
 Handles: ideas, gate_history, chats, chat_messages, users, coins.
 """
