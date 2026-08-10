@@ -734,16 +734,22 @@ with tab_ask:
     # ── Use global session ────────────────────────────────────────────────────
     import thinktank.engine.db as _askdb
     _ask_sid = _GLOBAL_SID
-    _ask_bal = _askdb.coin_balance(_ask_sid)
+    _ask_ai_bal     = _askdb.coin_balance(_ask_sid)
+    _ask_studio_bal = _askdb.studio_coin_balance(_ask_sid)
 
-    _bal_col, _buy_col = st.columns([3, 1])
+    _bal_col, _aicoin_col, _stcoin_col = st.columns([3, 1, 1])
     with _bal_col:
         st.subheader("Ask / Chat")
-    with _buy_col:
-        if _ask_bal > 0:
-            st.success(f"🪙 {_ask_bal} coins")
+    with _aicoin_col:
+        if _ask_ai_bal > 0:
+            st.success(f"🧠 AI: {_ask_ai_bal}")
         else:
-            st.warning("🪙 0 coins — go to 💳 Buy Coins tab")
+            st.warning("🧠 AI: 0 — 💳 Buy Coins")
+    with _stcoin_col:
+        if _ask_studio_bal > 0:
+            st.success(f"🎨 Studio: {_ask_studio_bal}")
+        else:
+            st.info(f"🎨 Studio: 0")
 
     chats   = chat_list(limit=50)
     chat_id = st.session_state.current_chat_id
@@ -1024,56 +1030,160 @@ with tab_studio:
 
     st.divider()
 
-    # ── Content Schedule (Mon–Sun viewer) ─────────────────────────────────────
-    st.markdown("### 📅 Your Content Schedule")
+
+    # -- Content Schedule: Weekly Grid (Mon-Sun x Platform) --------------------
+    st.markdown("### \U0001f4c5 Your Content Schedule")
     _all_content = studio_list(_studio_sid, user_email=st.session_state.auth_user)
 
     if not _all_content:
         st.caption("No content generated yet. Use the generator above to create your first post.")
     else:
-        _day_order = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","—"]
-        _by_day = {}
+        _PLAT_ICONS = {
+            "Twitter/X": "\U0001f426", "LinkedIn": "\U0001f4bc", "TikTok": "\U0001f3b5",
+            "Instagram": "\U0001f4f8", "Reddit": "\U0001f47d", "Facebook": "\U0001f4d8",
+            "YouTube": "\u25b6\ufe0f",  "Threads": "\U0001f9f5",
+        }
+        _DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+
+        # Build lookup: day -> platform -> list of content items
+        _grid = {d: {p: [] for p in _PLATFORMS} for d in _DAYS}
+        _unscheduled = []
         for _c in _all_content:
             if _c["scheduled_for"]:
                 try:
                     _wd = _dt.fromisoformat(_c["scheduled_for"]).strftime("%A")
                 except Exception:
-                    _wd = "—"
-            else:
-                _wd = "—"
-            _by_day.setdefault(_wd, []).append(_c)
-
-        for _day in _day_order:
-            if _day not in _by_day:
-                continue
-            st.markdown(f"**{_day}**")
-            for _c in _by_day[_day]:
-                _plat_icon = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵","Instagram":"📸","Reddit":"👽","Facebook":"📘","YouTube":"▶️","Threads":"🧵"}.get(_c["platform"],"📱")
-                if not _c["released"]:
-                    st.markdown(f"{_plat_icon} **{_c['platform']}** 🔒 *Unlocks {_c['scheduled_for']}*")
+                    _wd = None
+                if _wd in _DAYS:
+                    _grid[_wd][_c["platform"]].append(_c)
                 else:
-                    with st.expander(f"{_plat_icon} {_c['platform']} · {_c['tone']} · {_c['content_type']}", expanded=False):
-                        # editable text
-                        _edit_key = f"edit_{_c['id']}"
-                        _edited = st.text_area("Content", value=_c["content"], key=_edit_key, height=120)
-                        _ecol1, _ecol2 = st.columns(2)
-                        with _ecol1:
-                            _edit_label = "💾 Save Edit (FREE)" if _free_edits else "💾 Save Edit (3 coins)"
-                            if st.button(_edit_label, key=f"save_{_c['id']}"):
-                                if _edited.strip() == _c["content"].strip():
-                                    st.warning("No changes detected.")
-                                elif not _free_edits and _studio_bal < 3:
-                                    st.error("Not enough coins to save edit. Go to 💳 Buy Coins to top up.")
-                                else:
-                                    if not _free_edits:
-                                        _sdb.studio_coin_spend(_studio_sid, 3)
-                                    studio_update(_c["id"], _edited.strip())
-                                    st.success("✅ Saved!")
+                    _unscheduled.append(_c)
+            else:
+                _unscheduled.append(_c)
+
+        # Track which cell is open for editing
+        if "sched_open" not in st.session_state:
+            st.session_state.sched_open = None  # (day, platform, item_id)
+
+        # -- Weekly grid: one row per day, one column per platform in use ------
+        # Find which platforms actually have content
+        _active_plats = [p for p in _PLATFORMS if any(_grid[d][p] for d in _DAYS)]
+        if not _active_plats:
+            _active_plats = _PLATFORMS[:4]  # show first 4 as empty slots
+
+        # Header row
+        _hcols = st.columns([1] + [1]*len(_active_plats))
+        _hcols[0].markdown("**Day**")
+        for _hi, _hp in enumerate(_active_plats):
+            _hcols[_hi+1].markdown(f"**{_PLAT_ICONS.get(_hp,'')} {_hp}**")
+
+        st.markdown("---")
+
+        for _day in _DAYS:
+            _row = st.columns([1] + [1]*len(_active_plats))
+            _row[0].markdown(f"**{_day[:3]}**")
+            for _pi, _plat in enumerate(_active_plats):
+                _items = _grid[_day][_plat]
+                with _row[_pi+1]:
+                    if not _items:
+                        # Empty slot - grey placeholder
+                        st.markdown(
+                            '<div style="border:1px dashed #444;border-radius:6px;'
+                            'padding:6px 8px;text-align:center;color:#666;font-size:0.75rem;">'
+                            'empty</div>', unsafe_allow_html=True
+                        )
+                    else:
+                        for _ci in _items:
+                            _cell_key = (_day, _plat, _ci["id"])
+                            if not _ci["released"]:
+                                st.markdown(
+                                    f'<div style="border:1px solid #555;border-radius:6px;'
+                                    f'padding:6px 8px;text-align:center;font-size:0.75rem;color:#aaa;">'
+                                    f'\U0001f512 Scheduled<br>{_ci["scheduled_for"]}</div>',
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                # Clickable card
+                                _is_open = st.session_state.sched_open == _cell_key
+                                _btn_label = "\U0001f4dd Edit" if not _is_open else "\u2715 Close"
+                                _preview = _ci["content"][:40].replace("\n"," ") + "..."
+                                st.markdown(
+                                    f'<div style="border:1px solid #3b82d4;border-radius:6px;'
+                                    f'padding:6px 8px;font-size:0.72rem;color:#ccc;margin-bottom:4px;">'
+                                    f'{_preview}</div>',
+                                    unsafe_allow_html=True
+                                )
+                                if st.button(_btn_label, key=f"open_{_ci['id']}", use_container_width=True):
+                                    if _is_open:
+                                        st.session_state.sched_open = None
+                                    else:
+                                        st.session_state.sched_open = _cell_key
                                     st.rerun()
-                        with _ecol2:
-                            if st.button(f"🗑 Delete", key=f"del_{_c['id']}"):
-                                studio_delete(_c["id"])
+
+        # -- Inline editor: shown below the grid when a cell is open ----------
+        _open = st.session_state.get("sched_open")
+        if _open:
+            _o_day, _o_plat, _o_id = _open
+            _o_item = next((_c for _c in _all_content if _c["id"] == _o_id), None)
+            if _o_item:
+                st.markdown("---")
+                st.markdown(f"#### \U0001f4dd Editing: **{_o_plat}** — {_o_day}")
+                _edited = st.text_area(
+                    "Content", value=_o_item["content"],
+                    key=f"grid_edit_{_o_id}", height=180
+                )
+                _ec1, _ec2, _ec3 = st.columns(3)
+                with _ec1:
+                    _edit_label = "\U0001f4be Save (FREE)" if _free_edits else "\U0001f4be Save (3 coins)"
+                    if st.button(_edit_label, key=f"grid_save_{_o_id}", type="primary"):
+                        if _edited.strip() == _o_item["content"].strip():
+                            st.warning("No changes detected.")
+                        elif not _free_edits and _studio_bal < 3:
+                            st.error("Not enough Studio coins to save edit.")
+                        else:
+                            if not _free_edits:
+                                _sdb.studio_coin_spend(_studio_sid, 3)
+                            studio_update(_o_id, _edited.strip())
+                            st.session_state.sched_open = None
+                            st.success("\u2705 Saved!")
+                            st.rerun()
+                with _ec2:
+                    if st.button("\U0001f5d1 Delete", key=f"grid_del_{_o_id}"):
+                        studio_delete(_o_id)
+                        st.session_state.sched_open = None
+                        st.rerun()
+                with _ec3:
+                    if st.button("\u274c Close", key=f"grid_close_{_o_id}"):
+                        st.session_state.sched_open = None
+                        st.rerun()
+
+        # -- Unscheduled content (no day assigned) -----------------------------
+        if _unscheduled:
+            st.markdown("---")
+            st.markdown("#### \U0001f4cc Unscheduled Posts")
+            for _c in _unscheduled:
+                _ico = _PLAT_ICONS.get(_c["platform"], "\U0001f4f1")
+                with st.expander(f"{_ico} {_c['platform']} \u00b7 {_c['tone']}", expanded=False):
+                    _edit_key = f"unsched_edit_{_c['id']}"
+                    _edited = st.text_area("Content", value=_c["content"], key=_edit_key, height=120)
+                    _uc1, _uc2 = st.columns(2)
+                    with _uc1:
+                        _edit_label = "\U0001f4be Save (FREE)" if _free_edits else "\U0001f4be Save (3 coins)"
+                        if st.button(_edit_label, key=f"unsched_save_{_c['id']}"):
+                            if _edited.strip() == _c["content"].strip():
+                                st.warning("No changes detected.")
+                            elif not _free_edits and _studio_bal < 3:
+                                st.error("Not enough Studio coins to save edit.")
+                            else:
+                                if not _free_edits:
+                                    _sdb.studio_coin_spend(_studio_sid, 3)
+                                studio_update(_c["id"], _edited.strip())
+                                st.success("\u2705 Saved!")
                                 st.rerun()
+                    with _uc2:
+                        if st.button("\U0001f5d1 Delete", key=f"unsched_del_{_c['id']}"):
+                            studio_delete(_c["id"])
+                            st.rerun()
 
 
     # ==============================================================================
