@@ -1103,9 +1103,8 @@ with tab_studio:
                                     unsafe_allow_html=True
                                 )
                             else:
-                                # Clickable card
+                                # Clickable card — costs 1 coin to open editor
                                 _is_open = st.session_state.sched_open == _cell_key
-                                _btn_label = "\U0001f4dd Edit" if not _is_open else "\u2715 Close"
                                 _preview = _ci["content"][:40].replace("\n"," ") + "..."
                                 st.markdown(
                                     f'<div style="border:1px solid #3b82d4;border-radius:6px;'
@@ -1113,49 +1112,116 @@ with tab_studio:
                                     f'{_preview}</div>',
                                     unsafe_allow_html=True
                                 )
-                                if st.button(_btn_label, key=f"open_{_ci['id']}", use_container_width=True):
-                                    if _is_open:
+                                if _is_open:
+                                    if st.button("\u2715 Close", key=f"open_{_ci['id']}", use_container_width=True):
                                         st.session_state.sched_open = None
-                                    else:
-                                        st.session_state.sched_open = _cell_key
-                                    st.rerun()
+                                        st.rerun()
+                                else:
+                                    _edit_cost = 0 if _free_edits else 1
+                                    _open_lbl = "\U0001f4dd Edit (FREE)" if _free_edits else "\U0001f4dd Edit (1 coin)"
+                                    if st.button(_open_lbl, key=f"open_{_ci['id']}", use_container_width=True):
+                                        if not _free_edits and _studio_bal < 1:
+                                            st.error("Need 1 Studio coin to open editor.")
+                                        else:
+                                            if not _free_edits:
+                                                _sdb.studio_coin_spend(_studio_sid, 1)
+                                            st.session_state.sched_open = _cell_key
+                                            st.session_state[f"edit_paid_{_ci['id']}"] = True
+                                            st.rerun()
 
-        # -- Inline editor: shown below the grid when a cell is open ----------
+        # -- Inline editor: shown below grid when a cell is open ---------------
         _open = st.session_state.get("sched_open")
         if _open:
             _o_day, _o_plat, _o_id = _open
             _o_item = next((_c for _c in _all_content if _c["id"] == _o_id), None)
             if _o_item:
                 st.markdown("---")
-                st.markdown(f"#### \U0001f4dd Editing: **{_o_plat}** — {_o_day}")
+                st.markdown(f"#### \U0001f4dd Editing: **{_o_plat}** \u2014 {_o_day}")
+
+                # AI Revise mode toggle
+                if f"ai_revised_{_o_id}" not in st.session_state:
+                    st.session_state[f"ai_revised_{_o_id}"] = None
+
+                _ai_result = st.session_state.get(f"ai_revised_{_o_id}")
+
+                # Show current content or AI revision
+                _edit_value = _ai_result if _ai_result else _o_item["content"]
                 _edited = st.text_area(
-                    "Content", value=_o_item["content"],
-                    key=f"grid_edit_{_o_id}", height=180
+                    "Your content" + (" (AI revised — review before saving)" if _ai_result else ""),
+                    value=_edit_value,
+                    key=f"grid_edit_{_o_id}", height=200
                 )
-                _ec1, _ec2, _ec3 = st.columns(3)
+
+                # Action row
+                _ec1, _ec2, _ec3, _ec4 = st.columns(4)
+
                 with _ec1:
-                    _edit_label = "\U0001f4be Save (FREE)" if _free_edits else "\U0001f4be Save (3 coins)"
-                    if st.button(_edit_label, key=f"grid_save_{_o_id}", type="primary"):
-                        if _edited.strip() == _o_item["content"].strip():
+                    # Save My Edit — free since 1 coin already charged on open
+                    if st.button("\U0001f4be Save My Edit", key=f"grid_save_{_o_id}", type="primary"):
+                        if _edited.strip() == _o_item["content"].strip() and not _ai_result:
                             st.warning("No changes detected.")
-                        elif not _free_edits and _studio_bal < 3:
-                            st.error("Not enough Studio coins to save edit.")
                         else:
-                            if not _free_edits:
-                                _sdb.studio_coin_spend(_studio_sid, 3)
                             studio_update(_o_id, _edited.strip())
                             st.session_state.sched_open = None
+                            st.session_state[f"ai_revised_{_o_id}"] = None
                             st.success("\u2705 Saved!")
                             st.rerun()
+
                 with _ec2:
+                    # AI Revise — costs 3 coins, regenerates using original topic/tone
+                    _revise_cost = 0 if _free_edits else 3
+                    _revise_lbl = "\U0001f916 AI Revise (FREE)" if _free_edits else "\U0001f916 AI Revise (3 coins)"
+                    if st.button(_revise_lbl, key=f"grid_airev_{_o_id}"):
+                        if not _free_edits and _studio_bal < _revise_cost:
+                            st.error(f"Need {_revise_cost} Studio coins for AI revision.")
+                        else:
+                            with st.spinner("\U0001f916 AI is revising your post..."):
+                                import thinktank.engine.ai as _rev_ai
+                                from thinktank.config import STUDIO_SYSTEM_PROMPT as _RSYS
+                                _rev_prompt = (
+                                    f"You are revising a {_o_plat} post. "
+                                    f"Here is the current version:\n\n{_o_item['content']}\n\n"
+                                    f"Improve it: make it sharper, more engaging, better hooks, stronger CTA. "
+                                    f"Keep the same topic and tone ({_o_item['tone']}). "
+                                    f"Return ONLY the revised post, nothing else."
+                                )
+                                _rev_result = _rev_ai.chat([
+                                    {"role": "system", "content": _RSYS},
+                                    {"role": "user",   "content": _rev_prompt},
+                                ])
+                            if not _free_edits:
+                                _sdb.studio_coin_spend(_studio_sid, _revise_cost)
+                            st.session_state[f"ai_revised_{_o_id}"] = _rev_result
+                            st.rerun()
+
+                with _ec3:
                     if st.button("\U0001f5d1 Delete", key=f"grid_del_{_o_id}"):
                         studio_delete(_o_id)
                         st.session_state.sched_open = None
                         st.rerun()
-                with _ec3:
+
+                with _ec4:
                     if st.button("\u274c Close", key=f"grid_close_{_o_id}"):
                         st.session_state.sched_open = None
+                        st.session_state[f"ai_revised_{_o_id}"] = None
                         st.rerun()
+
+                # If AI revised, give choice to keep AI or keep own edit
+                if _ai_result:
+                    st.info(
+                        "\U0001f916 AI revision loaded above. Review it, make any tweaks, then click **Save My Edit** to keep it. "
+                        "Or edit the text yourself and save your own version."
+                    )
+
+                # ThinkTank Ask nudge
+                st.markdown("---")
+                st.markdown(
+                    "> \U0001f9e0 **Want to make this post even stronger?**  \n"
+                    "> Head to the **Ask tab** and paste your post there. Use **Score**, **Gate**, or just **Ask** to check "
+                    "> angles you might be missing, sharpen your hook, or test if the message lands — before you publish.",
+                )
+                st.caption("\U0001f4a1 Tip: Ask ThinkTank *\"What could make this post more compelling?\"* or *\"What objections might a reader have?\"*")
+
 
         # -- Unscheduled content (no day assigned) -----------------------------
         if _unscheduled:
