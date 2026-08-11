@@ -114,6 +114,19 @@ CREATE TABLE IF NOT EXISTS studio_coin_transactions (
     stripe_session TEXT,
     created_at     TEXT    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS sale_promo_codes (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    code           TEXT    NOT NULL UNIQUE,
+    label          TEXT    NOT NULL,
+    discount_pct   INTEGER NOT NULL DEFAULT 20,
+    bonus_coins    INTEGER NOT NULL DEFAULT 0,
+    max_uses       INTEGER NOT NULL DEFAULT 100,
+    uses           INTEGER NOT NULL DEFAULT 0,
+    active         INTEGER NOT NULL DEFAULT 1,
+    expires_at     TEXT,
+    created_at     TEXT    NOT NULL
+);
 """
 
 
@@ -838,3 +851,93 @@ def sid_clear_auth(session_id: str) -> None:
     """Remove the auth binding for this session (on explicit logout)."""
     with sqlite3.connect(DB_PATH) as con:
         con.execute("DELETE FROM sid_auth WHERE session_id=?", (session_id,))
+
+
+# -- Sale Promo Codes (admin-controlled, not per-user) ------------------------
+
+def sale_promo_create(code: str, label: str, discount_pct: int = 20,
+                      bonus_coins: int = 0, max_uses: int = 100,
+                      expires_at: str = None) -> dict:
+    """Create a new sale promo code. Returns error dict if code already exists."""
+    code = code.strip().upper()
+    with sqlite3.connect(DB_PATH) as con:
+        existing = con.execute(
+            "SELECT id FROM sale_promo_codes WHERE code=?", (code,)
+        ).fetchone()
+        if existing:
+            return {"ok": False, "error": f"Code {code} already exists."}
+        con.execute(
+            """INSERT INTO sale_promo_codes
+               (code, label, discount_pct, bonus_coins, max_uses, uses, active, expires_at, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?)""",
+            (code, label, discount_pct, bonus_coins, max_uses, expires_at, _utc()),
+        )
+    return {"ok": True, "code": code}
+
+
+def sale_promo_validate(code: str) -> dict:
+    """Validate a sale promo code. Returns discount info or error."""
+    from datetime import datetime, timezone
+    code = code.strip().upper()
+    with sqlite3.connect(DB_PATH) as con:
+        row = con.execute(
+            """SELECT id, label, discount_pct, bonus_coins, max_uses, uses, active, expires_at
+               FROM sale_promo_codes WHERE code=?""",
+            (code,)
+        ).fetchone()
+    if not row:
+        return {"valid": False, "error": "Invalid promo code."}
+    _id, label, disc, bonus, max_uses, uses, active, expires_at = row
+    if not active:
+        return {"valid": False, "error": "This promo code has been deactivated."}
+    if max_uses > 0 and uses >= max_uses:
+        return {"valid": False, "error": "This promo code has reached its usage limit."}
+    if expires_at:
+        try:
+            exp = datetime.fromisoformat(expires_at).replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > exp:
+                return {"valid": False, "error": "This promo code has expired."}
+        except Exception:
+            pass
+    return {
+        "valid": True, "label": label,
+        "discount_pct": disc, "bonus_coins": bonus,
+        "uses_remaining": max_uses - uses if max_uses > 0 else "unlimited",
+    }
+
+
+def sale_promo_use(code: str) -> bool:
+    """Increment usage count. Returns False if code no longer valid."""
+    result = sale_promo_validate(code)
+    if not result["valid"]:
+        return False
+    code = code.strip().upper()
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "UPDATE sale_promo_codes SET uses = uses + 1 WHERE code=?", (code,)
+        )
+    return True
+
+
+def sale_promo_list() -> list:
+    """Return all sale promo codes for admin view."""
+    with sqlite3.connect(DB_PATH) as con:
+        rows = con.execute(
+            """SELECT id, code, label, discount_pct, bonus_coins, max_uses, uses, active, expires_at, created_at
+               FROM sale_promo_codes ORDER BY id DESC"""
+        ).fetchall()
+    return [
+        {"id": r[0], "code": r[1], "label": r[2], "discount_pct": r[3],
+         "bonus_coins": r[4], "max_uses": r[5], "uses": r[6],
+         "active": bool(r[7]), "expires_at": r[8], "created_at": r[9]}
+        for r in rows
+    ]
+
+
+def sale_promo_toggle(code_id: int, active: bool) -> None:
+    """Activate or deactivate a promo code."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "UPDATE sale_promo_codes SET active=? WHERE id=?",
+            (1 if active else 0, code_id)
+        )
