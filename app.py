@@ -1035,183 +1035,204 @@ with tab_studio:
 
 
 
-    # ── Compact Content Library ─────────────────────────────────────────────
+
+    # ── Content Library ──────────────────────────────────────────────────────
     st.divider()
     _all_content = studio_list(_studio_sid, user_email=st.session_state.auth_user)
-    _total_posts = len(_all_content) if _all_content else 0
-    _scheduled_posts   = [c for c in (_all_content or []) if c.get("scheduled_for")]
-    _unscheduled_posts = [c for c in (_all_content or []) if not c.get("scheduled_for")]
+    _total_posts  = len(_all_content) if _all_content else 0
+    _sched_posts  = [c for c in (_all_content or []) if c.get("scheduled_for")]
+    _repo_posts   = [c for c in (_all_content or []) if not c.get("scheduled_for")]
 
     # Summary strip
-    _sc1, _sc2, _sc3 = st.columns(3)
-    _sc1.metric("📱 Saved Posts", _total_posts)
-    _sc2.metric("📅 Scheduled", len(_scheduled_posts))
-    _sc3.metric("📌 Unscheduled", len(_unscheduled_posts))
+    _sc1, _sc2 = st.columns(2)
+    _sc1.metric("📅 Scheduled Posts", len(_sched_posts))
+    _sc2.metric("📬 My Posts Repository", len(_repo_posts))
 
     if not _all_content:
-        st.caption("No content yet. Generate your first post above.")
+        st.caption("No content yet. Use the generator above to create your first post.")
     else:
         _PLAT_ICONS = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵",
                        "Instagram":"📸","Reddit":"👽","Facebook":"📘",
                        "YouTube":"▶️","Threads":"🧵"}
         _DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
-        def _edit_btn(content_id, day_label, plat):
+        def _open_editor(content_id, label, plat):
             if not _free_edits and _studio_bal < 1:
-                st.error("Need 1 Studio coin to edit.")
+                st.error("Need 1 Studio coin to open editor.")
                 return
             if not _free_edits:
                 _sdb.studio_coin_spend(_studio_sid, 1)
-            st.session_state.sched_open = (day_label, plat, content_id)
+            st.session_state.sched_open = (label, plat, content_id)
+            st.session_state["scroll_to_editor"] = True
             st.rerun()
 
-        # Folder 1: Scheduled
-        if _scheduled_posts:
-            with st.expander(f"📅  Scheduled Posts  ({len(_scheduled_posts)})", expanded=False):
+        # ── FOLDER 1: Scheduled Posts (day folders inside) ────────────────────
+        if _sched_posts:
+            with st.expander(f"📅  Scheduled Posts  ({len(_sched_posts)})", expanded=False):
                 _by_day = {}
-                for _c in _scheduled_posts:
-                    try: _wd = _dt.fromisoformat(_c["scheduled_for"]).strftime("%A")
-                    except: _wd = "Other"
+                for _c in _sched_posts:
+                    try:
+                        _wd = _dt.fromisoformat(_c["scheduled_for"]).strftime("%A")
+                    except Exception:
+                        _wd = "Other"
                     _by_day.setdefault(_wd, []).append(_c)
+
                 for _day in _DAYS + ["Other"]:
-                    if _day not in _by_day: continue
-                    st.markdown(f"**{_day}**")
-                    for _c in _by_day[_day]:
-                        _ico = _PLAT_ICONS.get(_c["platform"], "📱")
-                        _prev = _c["content"][:55].replace("\n"," ") + "..."
-                        ca, cb = st.columns([5,1])
-                        ca.markdown(f"{_ico} **{_c['platform']}** · _{_prev}_")
-                        with cb:
-                            if _c["released"]:
-                                if st.button("Edit", key=f"s_open_{_c['id']}", use_container_width=True):
-                                    _edit_btn(_c["id"], _day, _c["platform"])
-                            else:
-                                st.caption("🔒 Locked")
+                    if _day not in _by_day:
+                        continue
+                    _day_items = _by_day[_day]
+                    # Each day is its own collapsible folder
+                    with st.expander(f"📌 {_day}  ({len(_day_items)} post{'s' if len(_day_items)>1 else ''})", expanded=False):
+                        for _c in _day_items:
+                            _ico = _PLAT_ICONS.get(_c["platform"], "📱")
+                            _prev = _c["content"][:60].replace("\n", " ") + "..."
+                            ca, cb = st.columns([5, 1])
+                            ca.markdown(f"{_ico} **{_c['platform']}**")
+                            ca.caption(_prev)
+                            with cb:
+                                if not _c["released"]:
+                                    st.caption("🔒 Locked")
+                                else:
+                                    if st.button("Edit", key=f"s_open_{_c['id']}", use_container_width=True):
+                                        _open_editor(_c["id"], _day, _c["platform"])
+                            st.markdown("---")
 
-        # Folder 2: Unscheduled
-        if _unscheduled_posts:
-            with st.expander(f"📌  Unscheduled Posts  ({len(_unscheduled_posts)})", expanded=False):
-                for _c in _unscheduled_posts:
-                    _ico = _PLAT_ICONS.get(_c["platform"], "📱")
-                    _prev = _c["content"][:55].replace("\n"," ") + "..."
-                    ca, cb = st.columns([5,1])
-                    ca.markdown(f"{_ico} **{_c['platform']}** · {_c['tone']} · _{_prev}_")
-                    with cb:
-                        if st.button("Edit", key=f"u_open_{_c['id']}", use_container_width=True):
-                            _edit_btn(_c["id"], "Unscheduled", _c["platform"])
+        # ── FOLDER 2: My Posts Repository (all generated posts, newest first) ─
+        if _repo_posts:
+            with st.expander(f"📬  My Posts Repository  ({len(_repo_posts)})", expanded=False):
+                st.caption("All posts you've generated that aren't on a schedule. Your creative library.")
+                # Group by platform for easier navigation
+                _by_plat = {}
+                for _c in _repo_posts:
+                    _by_plat.setdefault(_c["platform"], []).append(_c)
+                for _plat in sorted(_by_plat.keys()):
+                    _plat_items = _by_plat[_plat]
+                    _ico = _PLAT_ICONS.get(_plat, "📱")
+                    with st.expander(f"{_ico} {_plat}  ({len(_plat_items)})", expanded=False):
+                        for _c in sorted(_plat_items, key=lambda x: x["created_at"], reverse=True):
+                            _prev = _c["content"][:60].replace("\n", " ") + "..."
+                            ca, cb = st.columns([5, 1])
+                            ca.markdown(f"**{_c['tone']}** · {_c['created_at'][:10]}")
+                            ca.caption(_prev)
+                            with cb:
+                                if st.button("Edit", key=f"r_open_{_c['id']}", use_container_width=True):
+                                    _open_editor(_c["id"], _plat, _plat)
+                            st.markdown("---")
 
-
-        # Folder 3: Download — per-section boxed transcripts
-        with st.expander(f"📥  Download Your Work  ({_total_posts} items)", expanded=False):
+        # ── FOLDER 3: Download (per-section) ─────────────────────────────────
+        with st.expander(f"📥  Download Your Work  ({_total_posts} posts)", expanded=False):
             from datetime import datetime as _dldt2
-            st.caption("Each section has its own download. No more one giant wall of text.")
-            st.markdown("---")
+            st.caption("Download by section — no more walls of text.")
 
-            # Section A: Scheduled Posts
-            if _scheduled_posts:
-                st.markdown("**📅 Scheduled Posts**")
-                _sched_lines = [f"THINKTANK — SCHEDULED POSTS", f"Account: {st.session_state.auth_user or 'Guest'}",
-                                f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
-                for _c in _scheduled_posts:
-                    _sched_lines += [
-                        f"\n[{_c['platform'].upper()}] {_c['tone']} | Scheduled: {_c.get('scheduled_for','?')} | ID #{_c['id']}",
-                        "-"*40, _c["content"], ""
-                    ]
-                st.download_button(
-                    "📥 Download Scheduled Posts",
-                    data="\n".join(_sched_lines).encode("utf-8"),
-                    file_name=f"tt_scheduled_{_dldt2.now().strftime('%Y%m%d')}.txt",
-                    mime="text/plain", use_container_width=True,
-                )
+            if _sched_posts:
+                _sl = [f"THINKTANK — SCHEDULED POSTS", f"Account: {st.session_state.auth_user or 'Guest'}",
+                       f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
+                for _c in _sched_posts:
+                    _sl += [f"\n[{_c['platform'].upper()}] Scheduled: {_c.get('scheduled_for','')} | {_c['tone']}",
+                            "-"*40, _c["content"], ""]
+                st.download_button("📥 Scheduled Posts (.txt)", data="\n".join(_sl).encode("utf-8"),
+                    file_name=f"tt_scheduled_{_dldt2.now().strftime('%Y%m%d')}.txt", mime="text/plain", use_container_width=True)
 
-            # Section B: Unscheduled Posts
-            if _unscheduled_posts:
-                st.markdown("**📌 Unscheduled Posts**")
-                _unsched_lines = [f"THINKTANK — UNSCHEDULED POSTS", f"Account: {st.session_state.auth_user or 'Guest'}",
-                                  f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
-                for _c in _unscheduled_posts:
-                    _unsched_lines += [
-                        f"\n[{_c['platform'].upper()}] {_c['tone']} | Created: {_c['created_at'][:10]} | ID #{_c['id']}",
-                        "-"*40, _c["content"], ""
-                    ]
-                st.download_button(
-                    "📥 Download Unscheduled Posts",
-                    data="\n".join(_unsched_lines).encode("utf-8"),
-                    file_name=f"tt_unscheduled_{_dldt2.now().strftime('%Y%m%d')}.txt",
-                    mime="text/plain", use_container_width=True,
-                )
+            if _repo_posts:
+                _rl = [f"THINKTANK — MY POSTS REPOSITORY", f"Account: {st.session_state.auth_user or 'Guest'}",
+                       f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
+                for _c in _repo_posts:
+                    _rl += [f"\n[{_c['platform'].upper()}] {_c['tone']} | Created: {_c['created_at'][:10]}",
+                            "-"*40, _c["content"], ""]
+                st.download_button("📥 My Posts Repository (.txt)", data="\n".join(_rl).encode("utf-8"),
+                    file_name=f"tt_repository_{_dldt2.now().strftime('%Y%m%d')}.txt", mime="text/plain", use_container_width=True)
 
-            # Section C: All together
-            st.markdown("---")
-            _all_lines = [f"THINKTANK — FULL CONTENT PACKAGE", f"Account: {st.session_state.auth_user or 'Guest'}",
-                          f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
+            _al = [f"THINKTANK — FULL CONTENT PACKAGE", f"Account: {st.session_state.auth_user or 'Guest'}",
+                   f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
             for _c in _all_content:
-                _all_lines += [
-                    f"\n[{_c['platform'].upper()}] {_c['tone']} | {_c['created_at'][:10]}" +
-                    (f" | Scheduled: {_c['scheduled_for']}" if _c.get('scheduled_for') else ""),
-                    "-"*40, _c["content"], ""
-                ]
-            _all_lines += ["\n" + "="*50, "Made with ThinkTank  www.thinktankapp.net", "="*50]
-            st.download_button(
-                "📥 Download Everything (.txt)",
-                data="\n".join(_all_lines).encode("utf-8"),
+                _al += [f"\n[{_c['platform'].upper()}] {_c['tone']} | {_c['created_at'][:10]}" +
+                        (f" | Scheduled: {_c['scheduled_for']}" if _c.get("scheduled_for") else ""),
+                        "-"*40, _c["content"], ""]
+            _al += ["\n"+"="*50, "Made with ThinkTank  www.thinktankapp.net", "="*50]
+            st.markdown("---")
+            st.download_button("📥 Download Everything (.txt)", data="\n".join(_al).encode("utf-8"),
                 file_name=f"thinktank_full_{_dldt2.now().strftime('%Y%m%d_%H%M')}.txt",
-                mime="text/plain", type="primary", use_container_width=True,
+                mime="text/plain", type="primary", use_container_width=True)
+
+        # ── Inline editor (auto-scroll via JS anchor) ─────────────────────────
+        _open = st.session_state.get("sched_open")
+
+        # Auto-scroll JS fires once when editor opens
+        if st.session_state.pop("scroll_to_editor", False):
+            import streamlit.components.v1 as _sc_v1
+            _sc_v1.html(
+                "<script>setTimeout(function(){"
+                "var el=window.parent.document.getElementById('tt-editor-anchor');"
+                "if(el)el.scrollIntoView({behavior:'smooth',block:'start'});"
+                "},300);</script>",
+                height=0,
             )
 
-        # Inline editor (below folders)
-        _open = st.session_state.get("sched_open")
+        st.markdown('<div id="tt-editor-anchor"></div>', unsafe_allow_html=True)
+
         if _open:
             _o_day, _o_plat, _o_id = _open
             _o_item = next((_c for _c in _all_content if _c["id"] == _o_id), None)
             if _o_item:
-                st.markdown("---")
-                st.markdown(f"#### 📝 **{_o_plat}** — {_o_day}")
-                _ai_result = st.session_state.get(f"ai_revised_{_o_id}")
-                _edited = st.text_area(
-                    "Content" + (" (AI revised)" if _ai_result else ""),
-                    value=_ai_result if _ai_result else _o_item["content"],
-                    key=f"grid_edit_{_o_id}", height=200
-                )
-                _ec1, _ec2, _ec3, _ec4 = st.columns(4)
-                with _ec1:
-                    if st.button("💾 Save", key=f"grid_save_{_o_id}", type="primary"):
-                        studio_update(_o_id, _edited.strip())
-                        st.session_state.sched_open = None
-                        st.session_state[f"ai_revised_{_o_id}"] = None
-                        st.success("✅ Saved!")
-                        st.rerun()
-                with _ec2:
-                    _rl = "🤖 AI Revise (FREE)" if _free_edits else "🤖 AI Revise (3 coins)"
-                    if st.button(_rl, key=f"grid_airev_{_o_id}"):
-                        if not _free_edits and _studio_bal < 3:
-                            st.error("Need 3 Studio coins.")
-                        else:
-                            with st.spinner("🤖 Revising..."):
-                                import thinktank.engine.ai as _rev_ai
-                                from thinktank.config import STUDIO_SYSTEM_PROMPT as _RSYS
-                                _rev = _rev_ai.chat([
-                                    {"role":"system","content":_RSYS},
-                                    {"role":"user","content":f"Revise this {_o_plat} post. Sharper hook, stronger CTA, same topic/tone ({_o_item['tone']}). Return ONLY the revised post.\n\n{_o_item['content']}"}
-                                ])
-                            if not _free_edits:
-                                _sdb.studio_coin_spend(_studio_sid, 3)
-                            st.session_state[f"ai_revised_{_o_id}"] = _rev
+                with st.container(border=True):
+                    st.markdown(f"#### 📝 **{_o_plat}** — {_o_day}")
+                    st.caption(f"Tone: {_o_item['tone']} · Created: {_o_item['created_at'][:10]}")
+
+                    _ai_result = st.session_state.get(f"ai_revised_{_o_id}")
+                    if _ai_result:
+                        st.info("🤖 AI revision ready below. Review it, then Save or discard.")
+
+                    _edited = st.text_area(
+                        "Edit your post" + (" — AI revised version" if _ai_result else ""),
+                        value=_ai_result if _ai_result else _o_item["content"],
+                        key=f"grid_edit_{_o_id}", height=220
+                    )
+
+                    _ec1, _ec2, _ec3, _ec4 = st.columns(4)
+                    with _ec1:
+                        if st.button("💾 Save", key=f"grid_save_{_o_id}", type="primary", use_container_width=True):
+                            studio_update(_o_id, _edited.strip())
+                            st.session_state.sched_open = None
+                            st.session_state[f"ai_revised_{_o_id}"] = None
+                            st.success("✅ Saved!")
                             st.rerun()
-                with _ec3:
-                    if st.button("🗑 Delete", key=f"grid_del_{_o_id}"):
-                        studio_delete(_o_id)
-                        st.session_state.sched_open = None
-                        st.rerun()
-                with _ec4:
-                    if st.button("❌ Close", key=f"grid_close_{_o_id}"):
-                        st.session_state.sched_open = None
-                        st.session_state[f"ai_revised_{_o_id}"] = None
-                        st.rerun()
-                if _ai_result:
-                    st.info("🤖 AI revision loaded above. Save it or keep editing.")
-                st.markdown("---")
-                st.caption("🧠 Tip: paste your post into the Ask tab and ask \'What could make this more compelling?\' before you publish.")
+                    with _ec2:
+                        _rl = "🤖 AI Revise (FREE)" if _free_edits else "🤖 AI Revise (3 coins)"
+                        if st.button(_rl, key=f"grid_airev_{_o_id}", use_container_width=True):
+                            if not _free_edits and _studio_bal < 3:
+                                st.error("Need 3 Studio coins.")
+                            else:
+                                with st.spinner("🤖 Revising your post..."):
+                                    import thinktank.engine.ai as _rev_ai
+                                    from thinktank.config import STUDIO_SYSTEM_PROMPT as _RSYS
+                                    _rev_prompt = (
+                                        f"Revise this {_o_plat} post. "
+                                        f"Make the hook sharper, the CTA stronger, the language more human. "
+                                        f"Keep the same topic and tone: {_o_item['tone']}. "
+                                        f"Return ONLY the revised post, nothing else.\n\n"
+                                        f"{_o_item['content']}"
+                                    )
+                                    _rev = _rev_ai.chat([
+                                        {"role": "system", "content": _RSYS},
+                                        {"role": "user",   "content": _rev_prompt},
+                                    ])
+                                if not _free_edits:
+                                    _sdb.studio_coin_spend(_studio_sid, 3)
+                                st.session_state[f"ai_revised_{_o_id}"] = _rev
+                                st.rerun()
+                    with _ec3:
+                        if st.button("🗑 Delete", key=f"grid_del_{_o_id}", use_container_width=True):
+                            studio_delete(_o_id)
+                            st.session_state.sched_open = None
+                            st.rerun()
+                    with _ec4:
+                        if st.button("❌ Close", key=f"grid_close_{_o_id}", use_container_width=True):
+                            st.session_state.sched_open = None
+                            st.session_state[f"ai_revised_{_o_id}"] = None
+                            st.rerun()
+
+                    st.markdown("---")
+                    st.caption("🧠 Tip: paste this post into the **Ask tab** — ask ThinkTank \'What objections might a reader have?\' before publishing.")
 
     # CREATOR POWER TOOLS — TIMED SESSION ACCESS
     # ==============================================================================
