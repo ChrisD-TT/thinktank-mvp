@@ -1178,17 +1178,19 @@ with tab_studio:
                     st.markdown(f"#### 📝 **{_o_plat}** — {_o_day}")
                     st.caption(f"Tone: {_o_item['tone']} · Created: {_o_item['created_at'][:10]}")
 
-                    _ai_was_applied = st.session_state.get(f"ai_revised_{_o_id}", False)
-                    if _ai_was_applied:
-                        st.success("🤖 AI revision applied — your post has been updated below.")
+                    # ai_revised_content holds the AI result; falls back to original
+                    _ai_content = st.session_state.get(f"ai_revised_content_{_o_id}")
+                    _current_val = _ai_content if _ai_content else _o_item["content"]
+                    _ai_badge = " — 🤖 AI revised" if _ai_content else ""
 
-                    # Seed widget with original content only on first open
-                    if f"grid_edit_{_o_id}" not in st.session_state:
-                        st.session_state[f"grid_edit_{_o_id}"] = _o_item["content"]
+                    if _ai_content:
+                        st.success("🤖 AI revision ready — review below then Save.")
 
+                    # NO key= so Streamlit always renders fresh with value=
                     _edited = st.text_area(
-                        "Edit your post" + (" — AI revised" if _ai_was_applied else ""),
-                        key=f"grid_edit_{_o_id}", height=220
+                        f"Edit your post{_ai_badge}",
+                        value=_current_val,
+                        height=220
                     )
 
                     _ec1, _ec2, _ec3, _ec4 = st.columns(4)
@@ -1196,7 +1198,7 @@ with tab_studio:
                         if st.button("💾 Save", key=f"grid_save_{_o_id}", type="primary", use_container_width=True):
                             studio_update(_o_id, _edited.strip())
                             st.session_state.sched_open = None
-                            st.session_state[f"ai_revised_{_o_id}"] = None
+                            st.session_state.pop(f"ai_revised_content_{_o_id}", None)
                             st.success("✅ Saved!")
                             st.rerun()
                     with _ec2:
@@ -1212,8 +1214,8 @@ with tab_studio:
                                         f"Revise this {_o_plat} post. "
                                         f"Make the hook sharper, the CTA stronger, the language more human. "
                                         f"Keep the same topic and tone: {_o_item['tone']}. "
-                                        f"Return ONLY the revised post, nothing else.\n\n"
-                                        f"{_o_item['content']}"
+                                        "Return ONLY the revised post, nothing else.\n\n"
+                                        + _o_item["content"]
                                     )
                                     _rev = _rev_ai.chat([
                                         {"role": "system", "content": _RSYS},
@@ -1221,25 +1223,24 @@ with tab_studio:
                                     ])
                                 if not _free_edits:
                                     _sdb.studio_coin_spend(_studio_sid, 3)
-                                # Write directly into the text_area widget key
-                                # so the revised text appears in-place on rerun
-                                st.session_state[f"grid_edit_{_o_id}"] = _rev
-                                st.session_state[f"ai_revised_{_o_id}"] = True
+                                # Store in separate key - never touch widget key
+                                st.session_state[f"ai_revised_content_{_o_id}"] = _rev
                                 st.rerun()
                     with _ec3:
                         if st.button("🗑 Delete", key=f"grid_del_{_o_id}", use_container_width=True):
                             studio_delete(_o_id)
                             st.session_state.sched_open = None
+                            st.session_state.pop(f"ai_revised_content_{_o_id}", None)
                             st.rerun()
                     with _ec4:
                         if st.button("❌ Close", key=f"grid_close_{_o_id}", use_container_width=True):
                             st.session_state.sched_open = None
-                            st.session_state.pop(f"ai_revised_{_o_id}", None)
-                            st.session_state.pop(f"grid_edit_{_o_id}", None)
+                            st.session_state.pop(f"ai_revised_content_{_o_id}", None)
                             st.rerun()
 
                     st.markdown("---")
-                    st.caption("🧠 Tip: paste this post into the **Ask tab** — ask ThinkTank \'What objections might a reader have?\' before publishing.")
+                    st.caption("🧠 Tip: paste into the Ask tab — ask ThinkTank 'What objections might a reader have?' before publishing.")
+
 
     # CREATOR POWER TOOLS — TIMED SESSION ACCESS
     # ==============================================================================
