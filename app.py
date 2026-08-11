@@ -1100,23 +1100,62 @@ with tab_studio:
                         if st.button("Edit", key=f"u_open_{_c['id']}", use_container_width=True):
                             _edit_btn(_c["id"], "Unscheduled", _c["platform"])
 
-        # Folder 3: Download
+
+        # Folder 3: Download — per-section boxed transcripts
         with st.expander(f"📥  Download Your Work  ({_total_posts} items)", expanded=False):
             from datetime import datetime as _dldt2
-            _dl_lines = ["="*60, "THINKTANK CONTENT PACKAGE",
-                         f"Account: {st.session_state.auth_user or 'Guest'}",
-                         f"Generated: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*60]
-            for _item in _all_content:
-                _dl_lines.append(f"\n{_item['platform'].upper()} | {_item['tone']} | {_item['created_at'][:10]}")
-                if _item.get("scheduled_for"):
-                    _dl_lines.append(f"Scheduled: {_item['scheduled_for']}")
-                _dl_lines.append("-"*40)
-                _dl_lines.append(_item["content"])
-            _dl_lines += ["\n\n" + "="*60, "Made with ThinkTank  www.thinktankapp.net", "="*60]
+            st.caption("Each section has its own download. No more one giant wall of text.")
+            st.markdown("---")
+
+            # Section A: Scheduled Posts
+            if _scheduled_posts:
+                st.markdown("**📅 Scheduled Posts**")
+                _sched_lines = [f"THINKTANK — SCHEDULED POSTS", f"Account: {st.session_state.auth_user or 'Guest'}",
+                                f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
+                for _c in _scheduled_posts:
+                    _sched_lines += [
+                        f"\n[{_c['platform'].upper()}] {_c['tone']} | Scheduled: {_c.get('scheduled_for','?')} | ID #{_c['id']}",
+                        "-"*40, _c["content"], ""
+                    ]
+                st.download_button(
+                    "📥 Download Scheduled Posts",
+                    data="\n".join(_sched_lines).encode("utf-8"),
+                    file_name=f"tt_scheduled_{_dldt2.now().strftime('%Y%m%d')}.txt",
+                    mime="text/plain", use_container_width=True,
+                )
+
+            # Section B: Unscheduled Posts
+            if _unscheduled_posts:
+                st.markdown("**📌 Unscheduled Posts**")
+                _unsched_lines = [f"THINKTANK — UNSCHEDULED POSTS", f"Account: {st.session_state.auth_user or 'Guest'}",
+                                  f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
+                for _c in _unscheduled_posts:
+                    _unsched_lines += [
+                        f"\n[{_c['platform'].upper()}] {_c['tone']} | Created: {_c['created_at'][:10]} | ID #{_c['id']}",
+                        "-"*40, _c["content"], ""
+                    ]
+                st.download_button(
+                    "📥 Download Unscheduled Posts",
+                    data="\n".join(_unsched_lines).encode("utf-8"),
+                    file_name=f"tt_unscheduled_{_dldt2.now().strftime('%Y%m%d')}.txt",
+                    mime="text/plain", use_container_width=True,
+                )
+
+            # Section C: All together
+            st.markdown("---")
+            _all_lines = [f"THINKTANK — FULL CONTENT PACKAGE", f"Account: {st.session_state.auth_user or 'Guest'}",
+                          f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
+            for _c in _all_content:
+                _all_lines += [
+                    f"\n[{_c['platform'].upper()}] {_c['tone']} | {_c['created_at'][:10]}" +
+                    (f" | Scheduled: {_c['scheduled_for']}" if _c.get('scheduled_for') else ""),
+                    "-"*40, _c["content"], ""
+                ]
+            _all_lines += ["\n" + "="*50, "Made with ThinkTank  www.thinktankapp.net", "="*50]
             st.download_button(
-                label="📥 Download All Content (.txt)",
-                data="\n".join(_dl_lines).encode("utf-8"),
-                file_name=f"thinktank_{_dldt2.now().strftime('%Y%m%d_%H%M')}.txt",
+                "📥 Download Everything (.txt)",
+                data="\n".join(_all_lines).encode("utf-8"),
+                file_name=f"thinktank_full_{_dldt2.now().strftime('%Y%m%d_%H%M')}.txt",
                 mime="text/plain", type="primary", use_container_width=True,
             )
 
@@ -2052,6 +2091,84 @@ with tab_admin:
                         st.caption(row["recommended_action"])
         else:
             st.caption("No gate history yet.")
+
+        st.divider()
+
+        # ── Transaction History (Coin Audit Trail) ────────────────────────────
+        st.markdown("### 📊 Transaction History")
+        st.caption("Full audit trail of every coin earned, spent, and purchased. This is your security log.")
+
+        import thinktank.engine.db as _txdb
+        import sqlite3 as _txsql
+        from thinktank.config import DB_PATH as _TX_DB
+
+        _tx_email_input = st.text_input("Look up user (email or leave blank for all recent)",
+                                        key="tx_email_lookup", placeholder="user@example.com")
+        _tx_limit = st.selectbox("Show last", [25, 50, 100, 250], key="tx_limit")
+
+        try:
+            with _txsql.connect(_TX_DB) as _txcon:
+                if _tx_email_input.strip():
+                    _tx_rows = _txcon.execute(
+                        "SELECT session_id, type, amount, stripe_session, created_at FROM coin_transactions "
+                        "WHERE session_id=? ORDER BY id DESC LIMIT ?",
+                        (_tx_email_input.strip().lower(), _tx_limit)
+                    ).fetchall()
+                    _tx_rows_s = _txcon.execute(
+                        "SELECT session_id, type, amount, stripe_session, created_at FROM studio_coin_transactions "
+                        "WHERE session_id=? ORDER BY id DESC LIMIT ?",
+                        (_tx_email_input.strip().lower(), _tx_limit)
+                    ).fetchall()
+                else:
+                    _tx_rows = _txcon.execute(
+                        "SELECT session_id, type, amount, stripe_session, created_at FROM coin_transactions "
+                        "ORDER BY id DESC LIMIT ?", (_tx_limit,)
+                    ).fetchall()
+                    _tx_rows_s = _txcon.execute(
+                        "SELECT session_id, type, amount, stripe_session, created_at FROM studio_coin_transactions "
+                        "ORDER BY id DESC LIMIT ?", (_tx_limit,)
+                    ).fetchall()
+
+            _tx_col1, _tx_col2 = st.columns(2)
+
+            with _tx_col1:
+                st.markdown("**🧠 AI Coin Transactions**")
+                if _tx_rows:
+                    for _tx in _tx_rows:
+                        _sid, _typ, _amt, _stripe, _ts = _tx
+                        _sid_short = _sid[:20] + "..." if len(_sid) > 20 else _sid
+                        _color = "🟢" if _amt > 0 else "🔴"
+                        _typ_label = {"welcome":"🎁 Welcome","purchase":"💳 Purchase",
+                                      "spend":"💨 Spent","merge":"🔀 Merge",
+                                      "refund":"↩ Refund"}.get(_typ, _typ)
+                        with st.container(border=True):
+                            st.markdown(f"{_color} **{_typ_label}** `{'+' if _amt>0 else ''}{_amt}` coins")
+                            st.caption(f"{_sid_short} · {_ts[:16]}")
+                            if _stripe and len(_stripe) < 60:
+                                st.caption(f"ref: `{_stripe}`")
+                else:
+                    st.caption("No AI transactions found.")
+
+            with _tx_col2:
+                st.markdown("**🎨 Studio Coin Transactions**")
+                if _tx_rows_s:
+                    for _tx in _tx_rows_s:
+                        _sid, _typ, _amt, _stripe, _ts = _tx
+                        _sid_short = _sid[:20] + "..." if len(_sid) > 20 else _sid
+                        _color = "🟢" if _amt > 0 else "🔴"
+                        _typ_label = {"purchase":"💳 Purchase","spend":"💨 Spent",
+                                      "merge":"🔀 Merge","refund":"↩ Refund"}.get(_typ, _typ)
+                        with st.container(border=True):
+                            st.markdown(f"{_color} **{_typ_label}** `{'+' if _amt>0 else ''}{_amt}` coins")
+                            st.caption(f"{_sid_short} · {_ts[:16]}")
+                            if _stripe and len(_stripe) < 60:
+                                st.caption(f"ref: `{_stripe}`")
+                else:
+                    st.caption("No Studio transactions found.")
+
+        except Exception as _txe:
+            st.error(f"Transaction history error: {_txe}")
+
     
 # ==============================================================================
 # LEGAL TAB
