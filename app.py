@@ -1943,7 +1943,10 @@ with tab_coins:
         # ── Promo code redemption ──────────────────────────────────────────────
         st.divider()
         st.markdown("#### 🎟 Have a Promo Code?")
-        from thinktank.engine.db import promo_validate, promo_apply
+        from thinktank.engine.db import (promo_validate, promo_apply,
+                                         sale_promo_validate, sale_promo_use,
+                                         studio_coin_get_or_create, studio_coin_credit,
+                                         coin_get_or_create, coin_credit)
         _promo_input = st.text_input("Enter promo code", placeholder="TT35-XXXXX-XXXX", key="promo_input")
         if st.button("Apply Code", key="apply_promo"):
             if not st.session_state.auth_user:
@@ -1951,13 +1954,35 @@ with tab_coins:
             elif not _promo_input.strip():
                 st.error("Please enter a promo code.")
             else:
-                _pv = promo_validate(_promo_input.strip())
-                if not _pv["valid"]:
-                    st.error(_pv["error"])
+                _code_raw = _promo_input.strip()
+                # Check sale (admin) promo codes first
+                _spv = sale_promo_validate(_code_raw)
+                if _spv["valid"]:
+                    sale_promo_use(_code_raw)
+                    _user_id = st.session_state.auth_user
+                    _msg_parts = []
+                    if _spv["discount_pct"] and _spv["discount_pct"] > 0:
+                        st.session_state["promo_discount"] = _spv["discount_pct"] / 100.0
+                        _msg_parts.append(f"**{_spv['discount_pct']}% off** your next purchase")
+                    if _spv["bonus_coins"] and _spv["bonus_coins"] > 0:
+                        import time as _pt
+                        coin_get_or_create(_user_id)
+                        coin_credit(_user_id, _spv["bonus_coins"],
+                                    f"sale-promo-{_code_raw.upper()}-{int(_pt.time())}")
+                        _msg_parts.append(f"**{_spv['bonus_coins']} AI coins** added to your wallet")
+                    _summary = " + ".join(_msg_parts) if _msg_parts else "code applied"
+                    st.success(f"🎉 Code **{_code_raw.upper()}** applied! {_summary}.")
+                    st.balloons()
                 else:
-                    promo_apply(_promo_input.strip())
-                    st.session_state["promo_discount"] = 0.35
-                    st.success("✅ Promo code applied! You'll get 35% off your next purchase. Select a pack above to buy.")
+                    # Fall back to per-user (referral) promo codes
+                    _pv = promo_validate(_code_raw)
+                    if not _pv["valid"]:
+                        # Show the sale promo error if it was closer (invalid vs expired/used)
+                        st.error(_pv["error"])
+                    else:
+                        promo_apply(_code_raw)
+                        st.session_state["promo_discount"] = 0.35
+                        st.success("✅ Promo code applied! You'll get 35% off your next purchase. Select a pack above to buy.")
 
         # ── Show current plan + promo if logged in ────────────────────────────
         if st.session_state.auth_user:
@@ -2203,6 +2228,87 @@ with tab_admin:
                         st.caption(row["recommended_action"])
         else:
             st.caption("No gate history yet.")
+
+        st.divider()
+
+        # ── Promo Code Manager ────────────────────────────────────────────────
+        st.markdown("### 🎟 Promo Code Manager")
+        st.caption("Create sale-wide promo codes. Anyone who enters the code gets the discount or bonus coins.")
+
+        from thinktank.engine.db import (sale_promo_create, sale_promo_list,
+                                         sale_promo_toggle, sale_promo_validate)
+
+        # Create new code
+        with st.expander("➕ Create New Promo Code", expanded=False):
+            _pc1, _pc2 = st.columns(2)
+            with _pc1:
+                _new_code  = st.text_input("Code (e.g. SUMMER25)", key="new_promo_code",
+                                           placeholder="SUMMER25").strip().upper()
+                _new_label = st.text_input("Description", key="new_promo_label",
+                                           placeholder="Summer sale — 25% off")
+                _new_disc  = st.number_input("Discount %", min_value=0, max_value=100,
+                                             value=20, key="new_promo_disc")
+            with _pc2:
+                _new_bonus = st.number_input("Bonus AI Coins (0 = none)", min_value=0,
+                                             max_value=10000, value=0, key="new_promo_bonus")
+                _new_max   = st.number_input("Max uses (0 = unlimited)", min_value=0,
+                                             max_value=100000, value=100, key="new_promo_max")
+                _new_exp   = st.date_input("Expiry date (optional)", value=None,
+                                           key="new_promo_exp")
+            if st.button("Create Code", type="primary", key="create_promo_btn"):
+                if not _new_code:
+                    st.error("Enter a code name.")
+                else:
+                    _exp_str = _new_exp.isoformat() + "T23:59:59" if _new_exp else None
+                    _res = sale_promo_create(
+                        _new_code, _new_label or _new_code,
+                        discount_pct=int(_new_disc),
+                        bonus_coins=int(_new_bonus),
+                        max_uses=int(_new_max),
+                        expires_at=_exp_str,
+                    )
+                    if _res["ok"]:
+                        st.success(f"✅ Code **{_res['code']}** created!")
+                        st.rerun()
+                    else:
+                        st.error(_res["error"])
+
+        # List all codes
+        _promo_codes = sale_promo_list()
+        if _promo_codes:
+            _pmc1, _pmc2, _pmc3, _pmc4, _pmc5, _pmc6 = st.columns([2, 3, 1, 1, 1, 1])
+            _pmc1.markdown("**Code**")
+            _pmc2.markdown("**Description**")
+            _pmc3.markdown("**Disc%**")
+            _pmc4.markdown("**Coins**")
+            _pmc5.markdown("**Uses**")
+            _pmc6.markdown("**Status**")
+            for _pc in _promo_codes:
+                _cc1, _cc2, _cc3, _cc4, _cc5, _cc6 = st.columns([2, 3, 1, 1, 1, 1])
+                with _cc1:
+                    st.code(_pc["code"], language=None)
+                with _cc2:
+                    st.caption(_pc["label"])
+                    if _pc["expires_at"]:
+                        st.caption(f"Exp: {_pc['expires_at'][:10]}")
+                with _cc3:
+                    st.markdown(f"`{_pc['discount_pct']}%`")
+                with _cc4:
+                    st.markdown(f"`{_pc['bonus_coins']}`")
+                with _cc5:
+                    _max_lbl = str(_pc['max_uses']) if _pc['max_uses'] > 0 else "∞"
+                    st.markdown(f"`{_pc['uses']}/{_max_lbl}`")
+                with _cc6:
+                    if _pc["active"]:
+                        if st.button("🟢 Deactivate", key=f"tog_{_pc['id']}", use_container_width=True):
+                            sale_promo_toggle(_pc["id"], False)
+                            st.rerun()
+                    else:
+                        if st.button("🔴 Activate", key=f"tog_{_pc['id']}", use_container_width=True):
+                            sale_promo_toggle(_pc["id"], True)
+                            st.rerun()
+        else:
+            st.caption("No promo codes created yet. Use the form above to create your first code.")
 
         st.divider()
 
