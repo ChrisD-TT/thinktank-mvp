@@ -62,9 +62,10 @@ if not st.session_state.auth_user:
 
 
 def _get_coin_session():
-    """Return (sid, db) — always uses the globally resolved session."""
+    """Return (sid, db) — uses email when logged in, anon SID otherwise."""
     import thinktank.engine.db as _gdb
-    return _GLOBAL_SID, _gdb
+    sid = st.session_state.auth_user if st.session_state.get("auth_user") else _GLOBAL_SID
+    return sid, _gdb
 
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -733,7 +734,7 @@ with tab_gate:
 with tab_ask:
     # ── Use global session ────────────────────────────────────────────────────
     import thinktank.engine.db as _askdb
-    _ask_sid = _GLOBAL_SID
+    _ask_sid = _auth_sid()  # use email when logged in, anon SID otherwise
     _ask_ai_bal     = _askdb.coin_balance(_ask_sid)
     _ask_studio_bal = _askdb.studio_coin_balance(_ask_sid)
 
