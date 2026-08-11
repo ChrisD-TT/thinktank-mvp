@@ -876,6 +876,7 @@ with tab_studio:
         "single":       7,   # single platform post
         "post_hook":    12,  # post + hashtags + hook (per platform)
         "tiktok":       18,  # TikTok/Reel script
+        "hashtags":     3,   # standalone hashtag set
         "edit":         3,   # edit existing content
     }
     _MULTI_DISC = 0.85  # 15% off when selecting multiple platforms
@@ -1030,6 +1031,88 @@ with tab_studio:
                     st.caption(f"ID #{_item['id']} · saved to your schedule")
             else:
                 st.info(f"🔒 {_lbl} — scheduled, unlocks on its release date")
+
+
+    # ── Hashtag Generator ────────────────────────────────────────────────────
+    st.markdown("### 🏷️ Hashtag Generator")
+    st.caption("Get a targeted set of hashtags for any topic and platform. **3 Studio coins per set.**")
+
+    with st.expander("Generate Hashtags", expanded=False):
+        if not st.session_state.auth_user:
+            st.info("🔑 Log in to use the Hashtag Generator.")
+        else:
+            _ht_plat = st.selectbox(
+                "Platform",
+                ["Instagram", "Twitter/X", "LinkedIn", "TikTok", "Facebook", "YouTube", "Threads", "Reddit"],
+                key="ht_platform"
+            )
+            _ht_topic = st.text_input(
+                "Topic or niche",
+                placeholder="e.g. fitness for busy moms, indie music release, B2B SaaS startup",
+                key="ht_topic"
+            )
+            _ht_style = st.radio(
+                "Hashtag style",
+                ["🔥 Trending & broad", "🎯 Niche & targeted", "🔁 Mix of both"],
+                horizontal=True, key="ht_style"
+            )
+            st.caption(f"Cost: **3 Studio coins** · Your balance: {_studio_bal} coins")
+
+            if st.button("🏷️ Generate Hashtags", key="ht_generate", type="primary", use_container_width=True):
+                if not _ht_topic.strip():
+                    st.error("Enter a topic first.")
+                elif _studio_bal < 3:
+                    st.error("🎨 Need 3 Studio coins. Go to 💳 Buy Coins to top up.")
+                else:
+                    with st.spinner("Finding the best hashtags..."):
+                        import thinktank.engine.ai as _ht_ai
+                        from thinktank.config import STUDIO_SYSTEM_PROMPT as _HT_SYS
+
+                        _style_map = {
+                            "🔥 Trending & broad": "trending and widely used",
+                            "🎯 Niche & targeted": "niche, specific, and highly targeted",
+                            "🔁 Mix of both": "a strategic mix of broad reach and niche targeting"
+                        }
+                        _ht_prompt = (
+                            f"Generate the optimal hashtag set for {_ht_plat} for this topic: {_ht_topic}.\n\n"
+                            f"Style: {_style_map.get(_ht_style, 'mixed')}\n\n"
+                            "Return:\n"
+                            "1. 5 PRIMARY hashtags (highest impact for this specific topic)\n"
+                            "2. 10 SECONDARY hashtags (supporting reach and discovery)\n"
+                            "3. 3 COMMUNITY hashtags (niche communities that will engage)\n"
+                            "4. One sentence explaining the strategy behind this selection.\n\n"
+                            f"Platform context: {_ht_plat}. Format each group clearly with its label. "
+                            "Include the # symbol on each hashtag. No extra commentary."
+                        )
+                        _ht_result = _ht_ai.chat([
+                            {"role": "system", "content": _HT_SYS},
+                            {"role": "user",   "content": _ht_prompt},
+                        ])
+
+                    _sdb.studio_coin_spend(_studio_sid, 3)
+                    st.session_state["ht_result"] = _ht_result
+                    st.session_state["ht_result_plat"] = _ht_plat
+                    st.session_state["ht_result_topic"] = _ht_topic
+
+            # Show result
+            if st.session_state.get("ht_result"):
+                st.markdown("---")
+                st.markdown(f"**🏷️ Hashtags for {st.session_state.get('ht_result_plat','')} · {st.session_state.get('ht_result_topic','')}**")
+                st.markdown(st.session_state["ht_result"])
+                _ht_copy_col, _ht_dl_col = st.columns(2)
+                with _ht_copy_col:
+                    st.code(st.session_state["ht_result"], language=None)
+                with _ht_dl_col:
+                    st.download_button(
+                        "📥 Download Hashtags (.txt)",
+                        data=st.session_state["ht_result"].encode("utf-8"),
+                        file_name=f"hashtags_{st.session_state.get('ht_result_plat','').replace('/','_')}_{st.session_state.get('ht_result_topic','')[:20].replace(' ','_')}.txt",
+                        mime="text/plain",
+                        use_container_width=True,
+                    )
+                if st.button("🗑 Clear", key="ht_clear"):
+                    st.session_state.pop("ht_result", None)
+                    st.rerun()
 
     st.divider()
 
