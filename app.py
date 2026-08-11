@@ -1178,13 +1178,16 @@ with tab_studio:
                     st.markdown(f"#### 📝 **{_o_plat}** — {_o_day}")
                     st.caption(f"Tone: {_o_item['tone']} · Created: {_o_item['created_at'][:10]}")
 
-                    _ai_result = st.session_state.get(f"ai_revised_{_o_id}")
-                    if _ai_result:
-                        st.info("🤖 AI revision ready below. Review it, then Save or discard.")
+                    _ai_was_applied = st.session_state.get(f"ai_revised_{_o_id}", False)
+                    if _ai_was_applied:
+                        st.success("🤖 AI revision applied — your post has been updated below.")
+
+                    # Seed widget with original content only on first open
+                    if f"grid_edit_{_o_id}" not in st.session_state:
+                        st.session_state[f"grid_edit_{_o_id}"] = _o_item["content"]
 
                     _edited = st.text_area(
-                        "Edit your post" + (" — AI revised version" if _ai_result else ""),
-                        value=_ai_result if _ai_result else _o_item["content"],
+                        "Edit your post" + (" — AI revised" if _ai_was_applied else ""),
                         key=f"grid_edit_{_o_id}", height=220
                     )
 
@@ -1218,7 +1221,10 @@ with tab_studio:
                                     ])
                                 if not _free_edits:
                                     _sdb.studio_coin_spend(_studio_sid, 3)
-                                st.session_state[f"ai_revised_{_o_id}"] = _rev
+                                # Write directly into the text_area widget key
+                                # so the revised text appears in-place on rerun
+                                st.session_state[f"grid_edit_{_o_id}"] = _rev
+                                st.session_state[f"ai_revised_{_o_id}"] = True
                                 st.rerun()
                     with _ec3:
                         if st.button("🗑 Delete", key=f"grid_del_{_o_id}", use_container_width=True):
@@ -1228,7 +1234,8 @@ with tab_studio:
                     with _ec4:
                         if st.button("❌ Close", key=f"grid_close_{_o_id}", use_container_width=True):
                             st.session_state.sched_open = None
-                            st.session_state[f"ai_revised_{_o_id}"] = None
+                            st.session_state.pop(f"ai_revised_{_o_id}", None)
+                            st.session_state.pop(f"grid_edit_{_o_id}", None)
                             st.rerun()
 
                     st.markdown("---")
