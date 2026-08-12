@@ -470,9 +470,10 @@ with st.sidebar:
 
 # ── Jump to Buy Coins tab via JS if flagged ───────────────────────────────────
 if st.session_state.pop("_jump_to_coins", False):
-    st.markdown(
+    import streamlit.components.v1 as _cmp
+    _cmp.html(
         "<script>window.parent.document.querySelectorAll('[data-baseweb=\"tab\"]')[7].click();</script>",
-        unsafe_allow_html=True,
+        height=0,
     )
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
