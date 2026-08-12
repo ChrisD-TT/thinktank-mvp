@@ -509,162 +509,244 @@ def _refund_coins(amount: int, reason: str = ""):
 # Stock themes — each defines CSS variables injected onto [data-testid="stAppViewContainer"]
 _STOCK_THEMES = {
     "default": {
-        "label": "⚪ Default",
-        "desc":  "Clean white — the ThinkTank standard",
+        "label": "☀️ Default",
+        "desc":  "Clean ThinkTank standard",
+        "preview": "linear-gradient(135deg,#ffffff 0%,#f0f4ff 100%)",
+        "preview_text": "#1f2328",
         "css": "",   # no override — uses Streamlit default
     },
     "midnight": {
-        "label": "🌑 Midnight",
-        "desc":  "Deep navy dark mode, electric blue accents",
+        "label": "🌌 Deep Space",
+        "desc":  "Starfield navy — electric blue accents",
+        "preview": "linear-gradient(135deg,#020818 0%,#0a1628 50%,#0d2040 100%)",
+        "preview_text": "#7eb8f7",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: #0a0f1e !important;
-                color: #e8eaf6 !important;
+                background: linear-gradient(160deg,#020818 0%,#0a1628 55%,#0d2040 100%) !important;
+                color: #dce9ff !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #90caf9 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #7eb8f7 !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #cfd8dc !important; }
-            [data-testid="stMetric"] { background: #0d1b2a !important; border-radius:8px; padding:8px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#0d1b2a !important; border-color:#1e3a5f !important; }
-            .stTabs [data-baseweb="tab-list"] { background:#0d1b2a !important; }
-            .stTabs [data-baseweb="tab"] { color:#90caf9 !important; }
-            [data-testid="stSidebar"] { background:#060c18 !important; }
+            [data-testid="stAppViewContainer"] span { color: #b8d0ee !important; }
+            [data-testid="stMarkdownContainer"] p { color: #b8d0ee !important; }
+            [data-testid="stMetric"] { background: rgba(14,30,58,0.85) !important; border:1px solid #1e3a6e !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(10,22,44,0.7) !important; border-color:#1e3a6e !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(6,14,30,0.9) !important; }
+            .stTabs [data-baseweb="tab"] { color:#7eb8f7 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#020d1e,#04152e) !important; }
+            [data-testid="stSidebar"] * { color:#b8d0ee !important; }
         """,
     },
-    "forest": {
-        "label": "🌲 Forest",
-        "desc":  "Deep green, warm amber highlights",
+    "aurora": {
+        "label": "🌌 Aurora",
+        "desc":  "Northern lights — teal fades to violet",
+        "preview": "linear-gradient(135deg,#011a12 0%,#042a2b 40%,#0d1b38 70%,#1a0d2e 100%)",
+        "preview_text": "#4dffc3",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: #0d1f0f !important;
-                color: #e8f5e9 !important;
+                background: linear-gradient(160deg,#011810 0%,#03231e 30%,#0a1830 65%,#160b28 100%) !important;
+                color: #d4fef4 !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #a5d6a7 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #4dffc3 !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #c8e6c9 !important; }
-            [data-testid="stMetric"] { background: #132b14 !important; border-radius:8px; padding:8px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#132b14 !important; border-color:#2e7d32 !important; }
-            .stTabs [data-baseweb="tab-list"] { background:#0a180b !important; }
-            .stTabs [data-baseweb="tab"] { color:#a5d6a7 !important; }
-            [data-testid="stSidebar"] { background:#071008 !important; }
+            [data-testid="stAppViewContainer"] span { color: #a8f0de !important; }
+            [data-testid="stMarkdownContainer"] p { color: #a8f0de !important; }
+            [data-testid="stMetric"] { background: rgba(5,40,30,0.8) !important; border:1px solid #0d6e54 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(3,28,22,0.7) !important; border-color:#0d6e54 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(1,20,15,0.9) !important; }
+            .stTabs [data-baseweb="tab"] { color:#4dffc3 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#010e09,#031a16) !important; }
+            [data-testid="stSidebar"] * { color:#a8f0de !important; }
         """,
     },
     "sunset": {
-        "label": "🌅 Sunset",
-        "desc":  "Warm orange-to-crimson gradient feel",
+        "label": "🌅 Golden Hour",
+        "desc":  "Dusk amber melting into deep crimson",
+        "preview": "linear-gradient(135deg,#1a0800 0%,#2d0f00 40%,#3d1500 100%)",
+        "preview_text": "#ffb347",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: #1a0a00 !important;
-                color: #fff3e0 !important;
+                background: linear-gradient(160deg,#100500 0%,#250c00 40%,#3a1000 75%,#1a0000 100%) !important;
+                color: #ffe8c8 !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #ffb74d !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #ffb347 !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #ffe0b2 !important; }
-            [data-testid="stMetric"] { background: #2c1200 !important; border-radius:8px; padding:8px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#2c1200 !important; border-color:#e65100 !important; }
-            .stTabs [data-baseweb="tab-list"] { background:#1a0800 !important; }
-            .stTabs [data-baseweb="tab"] { color:#ffb74d !important; }
-            [data-testid="stSidebar"] { background:#110600 !important; }
-        """,
-    },
-    "arctic": {
-        "label": "❄️ Arctic",
-        "desc":  "Icy blue-white, ultra-clean minimal",
-        "css": """
-            [data-testid="stAppViewContainer"] {
-                background: #e8f4fd !important;
-                color: #0d2137 !important;
-            }
-            [data-testid="stAppViewContainer"] h1,
-            [data-testid="stAppViewContainer"] h2,
-            [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #01579b !important; }
-            [data-testid="stAppViewContainer"] p,
-            [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #1a3c5e !important; }
-            [data-testid="stMetric"] { background: #daeeff !important; border-radius:8px; padding:8px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#daeeff !important; border-color:#90caf9 !important; }
-            .stTabs [data-baseweb="tab-list"] { background:#c9e8fb !important; }
-            .stTabs [data-baseweb="tab"] { color:#01579b !important; }
-            [data-testid="stSidebar"] { background:#c5e3f7 !important; }
-        """,
-    },
-    "rose_gold": {
-        "label": "🌹 Rose Gold",
-        "desc":  "Elegant blush-pink and soft gold tones",
-        "css": """
-            [data-testid="stAppViewContainer"] {
-                background: #1a0d10 !important;
-                color: #fce4ec !important;
-            }
-            [data-testid="stAppViewContainer"] h1,
-            [data-testid="stAppViewContainer"] h2,
-            [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #f48fb1 !important; }
-            [data-testid="stAppViewContainer"] p,
-            [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #f8bbd0 !important; }
-            [data-testid="stMetric"] { background: #2c1018 !important; border-radius:8px; padding:8px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#2c1018 !important; border-color:#c2185b !important; }
-            .stTabs [data-baseweb="tab-list"] { background:#1a0810 !important; }
-            .stTabs [data-baseweb="tab"] { color:#f48fb1 !important; }
-            [data-testid="stSidebar"] { background:#12060c !important; }
+            [data-testid="stAppViewContainer"] span { color: #f5cfa0 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #f5cfa0 !important; }
+            [data-testid="stMetric"] { background: rgba(45,16,0,0.85) !important; border:1px solid #7a2800 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(32,8,0,0.7) !important; border-color:#7a2800 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(16,4,0,0.9) !important; }
+            .stTabs [data-baseweb="tab"] { color:#ffb347 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#0a0200,#180600) !important; }
+            [data-testid="stSidebar"] * { color:#f5cfa0 !important; }
         """,
     },
     "neon": {
-        "label": "⚡ Neon",
-        "desc":  "Pure black with neon green cyber accents",
+        "label": "⚡ Cyberpunk",
+        "desc":  "Pitch black — neon grid with cyan & magenta",
+        "preview": "linear-gradient(135deg,#000000 0%,#050010 50%,#000000 100%)",
+        "preview_text": "#00fff0",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: #000000 !important;
-                color: #e0e0e0 !important;
+                background: linear-gradient(160deg,#000000 0%,#04000e 50%,#000000 100%) !important;
+                color: #e0e0ff !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #39ff14 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #00fff0 !important; text-shadow: 0 0 8px #00fff088; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #b0b0b0 !important; }
-            [data-testid="stMetric"] { background: #0a0a0a !important; border:1px solid #39ff14 !important; border-radius:8px; padding:8px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#0a0a0a !important; border-color:#39ff14 !important; }
+            [data-testid="stAppViewContainer"] span { color: #c0c0e8 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #c0c0e8 !important; }
+            [data-testid="stMetric"] { background: #050010 !important; border:1px solid #00fff055 !important; border-radius:8px; padding:10px; box-shadow: 0 0 10px #00fff022; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#04000e !important; border-color:#ff00ff55 !important; border-radius:10px !important; box-shadow: 0 0 8px #ff00ff22; }
             .stTabs [data-baseweb="tab-list"] { background:#000 !important; }
-            .stTabs [data-baseweb="tab"] { color:#39ff14 !important; }
-            [data-testid="stSidebar"] { background:#000 !important; }
+            .stTabs [data-baseweb="tab"] { color:#00fff0 !important; }
+            [data-testid="stSidebar"] { background:#000000 !important; border-right: 1px solid #00fff033 !important; }
+            [data-testid="stSidebar"] * { color:#c0c0e8 !important; }
+        """,
+    },
+    "rose_gold": {
+        "label": "✨ Rose Gold",
+        "desc":  "Luxe dark rose melting into champagne gold",
+        "preview": "linear-gradient(135deg,#1a0510 0%,#2a0c18 40%,#1f0f05 100%)",
+        "preview_text": "#f9a8b8",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: linear-gradient(160deg,#130308 0%,#220812 40%,#1c0b03 75%,#0e0408 100%) !important;
+                color: #fde8ef !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #f9a8b8 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #f0c8d0 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #f0c8d0 !important; }
+            [data-testid="stMetric"] { background: rgba(38,8,20,0.85) !important; border:1px solid #8b1a3a !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(28,5,14,0.7) !important; border-color:#8b1a3a !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(15,2,8,0.9) !important; }
+            .stTabs [data-baseweb="tab"] { color:#f9a8b8 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#0e0306,#1a0610) !important; }
+            [data-testid="stSidebar"] * { color:#f0c8d0 !important; }
         """,
     },
     "purple_haze": {
-        "label": "💜 Purple Haze",
-        "desc":  "Deep violet with soft lavender highlights",
+        "label": "🔮 Galaxy",
+        "desc":  "Deep cosmos — rich violet to indigo",
+        "preview": "linear-gradient(135deg,#080318 0%,#12053a 50%,#06001a 100%)",
+        "preview_text": "#c084fc",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: #0e0718 !important;
-                color: #ede7f6 !important;
+                background: linear-gradient(160deg,#050112 0%,#0e0430 45%,#160860 70%,#080118 100%) !important;
+                color: #ece8ff !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #ce93d8 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #c084fc !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #d1c4e9 !important; }
-            [data-testid="stMetric"] { background: #1a0a2e !important; border-radius:8px; padding:8px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#1a0a2e !important; border-color:#7b1fa2 !important; }
-            .stTabs [data-baseweb="tab-list"] { background:#0e0718 !important; }
-            .stTabs [data-baseweb="tab"] { color:#ce93d8 !important; }
-            [data-testid="stSidebar"] { background:#08030f !important; }
+            [data-testid="stAppViewContainer"] span { color: #d4c4f8 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #d4c4f8 !important; }
+            [data-testid="stMetric"] { background: rgba(20,6,50,0.85) !important; border:1px solid #5b21b6 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(12,3,35,0.75) !important; border-color:#5b21b6 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(5,1,18,0.95) !important; }
+            .stTabs [data-baseweb="tab"] { color:#c084fc !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#040010,#0a0220) !important; }
+            [data-testid="stSidebar"] * { color:#d4c4f8 !important; }
+        """,
+    },
+    "ocean": {
+        "label": "🌊 Ocean Deep",
+        "desc":  "Midnight teal depths — bioluminescent glow",
+        "preview": "linear-gradient(135deg,#001a20 0%,#002d38 40%,#001520 100%)",
+        "preview_text": "#22d3ee",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: linear-gradient(160deg,#000d12 0%,#001820 40%,#002535 70%,#000e15 100%) !important;
+                color: #d0f4ff !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #22d3ee !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #a0e8f8 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #a0e8f8 !important; }
+            [data-testid="stMetric"] { background: rgba(0,28,38,0.85) !important; border:1px solid #0e7490 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(0,20,28,0.75) !important; border-color:#0e7490 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(0,10,16,0.95) !important; }
+            .stTabs [data-baseweb="tab"] { color:#22d3ee !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#00080e,#001018) !important; }
+            [data-testid="stSidebar"] * { color:#a0e8f8 !important; }
+        """,
+    },
+    "ember": {
+        "label": "🔥 Ember",
+        "desc":  "Smoldering dark coal — deep red embers",
+        "preview": "linear-gradient(135deg,#0e0000 0%,#1e0500 40%,#2a0800 100%)",
+        "preview_text": "#ff6b35",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: linear-gradient(160deg,#090000 0%,#180300 40%,#260600 70%,#0c0000 100%) !important;
+                color: #ffd0b8 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #ff6b35 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #f0a080 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #f0a080 !important; }
+            [data-testid="stMetric"] { background: rgba(30,5,0,0.85) !important; border:1px solid #7c1d00 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(22,3,0,0.75) !important; border-color:#7c1d00 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(8,0,0,0.95) !important; }
+            .stTabs [data-baseweb="tab"] { color:#ff6b35 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#060000,#100200) !important; }
+            [data-testid="stSidebar"] * { color:#f0a080 !important; }
+        """,
+    },
+    "arctic": {
+        "label": "🏔️ Arctic",
+        "desc":  "Crisp glacier white — clean cobalt accents",
+        "preview": "linear-gradient(135deg,#f0f8ff 0%,#e0f0ff 50%,#d8ecff 100%)",
+        "preview_text": "#0369a1",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: linear-gradient(160deg,#f8fcff 0%,#edf5ff 50%,#e0eeff 100%) !important;
+                color: #0c2340 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #0369a1 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #1e4068 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #1e4068 !important; }
+            [data-testid="stMetric"] { background: rgba(224,238,255,0.9) !important; border:1px solid #7dd3fc !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(232,246,255,0.8) !important; border-color:#7dd3fc !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(200,230,255,0.9) !important; }
+            .stTabs [data-baseweb="tab"] { color:#0369a1 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#e8f4ff,#d8eeff) !important; }
+            [data-testid="stSidebar"] * { color:#1e4068 !important; }
         """,
     },
 }
@@ -754,28 +836,38 @@ with tab_dash:
                 _tm = _STOCK_THEMES[_tk]
                 with _tcols[_ti % 4]:
                     _is_active = (_dash_theme["theme"] == _tk)
-                    _border = "3px solid #3b82d4" if _is_active else "1px solid #ddd"
-                    # Render a preview swatch
-                    _swatch_bg  = "#ffffff"
-                    _swatch_acc = "#1f2328"
-                    if _tk == "midnight":     _swatch_bg, _swatch_acc = "#0a0f1e", "#90caf9"
-                    elif _tk == "forest":     _swatch_bg, _swatch_acc = "#0d1f0f", "#a5d6a7"
-                    elif _tk == "sunset":     _swatch_bg, _swatch_acc = "#1a0a00", "#ffb74d"
-                    elif _tk == "arctic":     _swatch_bg, _swatch_acc = "#e8f4fd", "#01579b"
-                    elif _tk == "rose_gold":  _swatch_bg, _swatch_acc = "#1a0d10", "#f48fb1"
-                    elif _tk == "neon":       _swatch_bg, _swatch_acc = "#000000", "#39ff14"
-                    elif _tk == "purple_haze":_swatch_bg, _swatch_acc = "#0e0718", "#ce93d8"
+                    _border = "3px solid #3b82d4" if _is_active else "1px solid #334"
+                    _preview_grad = _tm.get("preview", "linear-gradient(135deg,#f0f4ff,#ffffff)")
+                    _preview_text = _tm.get("preview_text", "#1f2328")
+                    _active_badge = (
+                        '<div style="position:absolute;top:6px;right:8px;'
+                        'background:#3b82d4;color:#fff;font-size:0.62rem;'
+                        'padding:2px 7px;border-radius:20px;font-weight:700;">✓ Active</div>'
+                        if _is_active else ""
+                    )
                     st.markdown(
-                        f"""<div style="border:{_border};border-radius:8px;padding:10px;
-                                        background:{_swatch_bg};margin-bottom:6px;cursor:pointer;">
-                                <div style="font-size:0.85rem;font-weight:700;color:{_swatch_acc};">{_tm['label']}</div>
-                                <div style="font-size:0.72rem;color:{_swatch_acc};opacity:0.7;">{_tm['desc']}</div>
-                                {'<div style="font-size:0.68rem;color:#3b82d4;margin-top:4px;">✓ Active</div>' if _is_active else ''}
+                        f"""<div style="position:relative;border:{_border};border-radius:10px;
+                                        overflow:hidden;margin-bottom:6px;">
+                                <div style="background:{_preview_grad};
+                                            padding:18px 12px 12px;min-height:70px;
+                                            display:flex;flex-direction:column;justify-content:flex-end;">
+                                    {_active_badge}
+                                    <div style="font-size:0.82rem;font-weight:700;
+                                                color:{_preview_text};
+                                                text-shadow:0 1px 3px rgba(0,0,0,0.6);">
+                                        {_tm['label']}
+                                    </div>
+                                </div>
+                                <div style="background:#1a1a2e;padding:8px 12px;">
+                                    <div style="font-size:0.70rem;color:#9aa5b4;line-height:1.4;">
+                                        {_tm['desc']}
+                                    </div>
+                                </div>
                             </div>""",
                         unsafe_allow_html=True,
                     )
                     if not _is_active:
-                        if st.button(f"Apply", key=f"theme_apply_{_tk}", use_container_width=True):
+                        if st.button("Apply", key=f"theme_apply_{_tk}", use_container_width=True):
                             dashboard_save_theme(_dash_user, _tk)
                             st.rerun()
 
