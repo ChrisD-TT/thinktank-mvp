@@ -469,15 +469,8 @@ with st.sidebar:
     st.caption("🔗 " + _share_url)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-_TAB_LABELS = ["🏠 My Dashboard", "💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin", "📄 Legal"]
-
-# Allow any code to navigate to a tab by writing:
-#   st.session_state["main_tabs"] = "💳 Buy Coins"; st.rerun()
-# st.tabs with key= + on_change="rerun" lets session_state[key] control the active tab.
 tab_dash, tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin, tab_legal = st.tabs(
-    _TAB_LABELS,
-    key="main_tabs",
-    on_change="rerun",
+    ["🏠 My Dashboard", "💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin", "📄 Legal"]
 )
 
 # ==============================================================================
