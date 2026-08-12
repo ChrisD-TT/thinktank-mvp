@@ -1808,18 +1808,23 @@ with tab_studio:
             if st.session_state.get("ht_result"):
                 st.markdown("---")
                 st.markdown(f"**🏷️ Hashtags for {st.session_state.get('ht_result_plat','')} · {st.session_state.get('ht_result_topic','')}**")
+                # Formatted display
                 st.markdown(st.session_state["ht_result"])
-                _ht_copy_col, _ht_dl_col = st.columns(2)
-                with _ht_copy_col:
-                    st.code(st.session_state["ht_result"], language=None)
-                with _ht_dl_col:
-                    st.download_button(
-                        "📥 Download Hashtags (.txt)",
-                        data=st.session_state["ht_result"].encode("utf-8"),
-                        file_name=f"hashtags_{st.session_state.get('ht_result_plat','').replace('/','_')}_{st.session_state.get('ht_result_topic','')[:20].replace(' ','_')}.txt",
-                        mime="text/plain",
-                        use_container_width=True,
-                    )
+                # One-click copy block — just the hashtags, no strategy text
+                _ht_raw = st.session_state["ht_result"]
+                _ht_tags_only = " ".join(
+                    w for w in _ht_raw.split() if w.startswith("#")
+                )
+                st.caption("📋 Copy all hashtags:")
+                st.code(_ht_tags_only, language=None)
+                # Download + clear
+                st.download_button(
+                    "📥 Download Hashtags (.txt)",
+                    data=_ht_raw.encode("utf-8"),
+                    file_name=f"hashtags_{st.session_state.get('ht_result_plat','').replace('/','_')}_{st.session_state.get('ht_result_topic','')[:20].replace(' ','_')}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
                 if st.button("🗑 Clear", key="ht_clear"):
                     st.session_state.pop("ht_result", None)
                     st.rerun()
