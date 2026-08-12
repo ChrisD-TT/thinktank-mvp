@@ -95,6 +95,10 @@ st.markdown(
 
     /* Hide the status/running widget in the bottom-right corner */
     [data-testid="stStatusWidget"] { display: none !important; }
+
+    /* Hide Streamlit's "Made with Streamlit" footer */
+    footer { display: none !important; }
+    [data-testid="stFooter"] { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -346,7 +350,7 @@ def _auth_sid():
 
 with st.sidebar:
     st.title("🧠 ThinkTank")
-    st.caption("Powered by OpenAI · gpt-4o-mini")
+    st.caption("AI-powered content & strategy tools")
     st.divider()
 
     # ── Login / Register ───────────────────────────────────────────────────
@@ -1120,7 +1124,7 @@ with tab_dash:
                 _ref_c2.metric("Coins Earned", _ref_data["coins_earned"])
                 _ref_c3.metric("Coins per Referral", "10")
                 st.code(_ref_data["referral_url"], language=None)
-                st.caption("Share this link. When someone registers through it, **they get 5 free AI coins** and **you get 10 free AI coins** — automatically.")
+                st.markdown("Share this link. When someone registers through it, they get **5 free AI coins** and you get **10 free AI coins** — automatically.")
 
                 # Mini coin history
                 if stats["recent_txns"]:
@@ -1130,7 +1134,8 @@ with tab_dash:
                         _clr  = "🟢" if _tx["amount"] > 0 else "🔴"
                         _lbl  = {"welcome":"🎁 Welcome","purchase":"💳 Purchase",
                                  "spend":"💨 Spent","merge":"🔀 Merge",
-                                 "refund":"↩ Refund","admin-grant":"✅ Grant"}.get(_tx["type"], _tx["type"])
+                                 "refund":"↩ Refund","admin-grant":"✅ Grant",
+                                 "referral-reward":"🔗 Referral","referral-bonus":"🎁 Referral Bonus"}.get(_tx["type"], _tx["type"])
                         st.caption(f"{_clr} {_lbl} · {_sign}{_tx['amount']} · {_tx['created_at'][:10]}")
 
             elif wid == "recent_posts":
