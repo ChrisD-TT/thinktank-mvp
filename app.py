@@ -468,14 +468,6 @@ with st.sidebar:
     )
     st.caption("🔗 " + _share_url)
 
-# ── Jump to Buy Coins tab via JS if flagged ───────────────────────────────────
-if st.session_state.pop("_jump_to_coins", False):
-    import streamlit.components.v1 as _cmp
-    _cmp.html(
-        "<script>window.parent.document.querySelectorAll('[data-baseweb=\"tab\"]')[7].click();</script>",
-        height=0,
-    )
-
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_dash, tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin, tab_legal = st.tabs(
     ["🏠 My Dashboard", "💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin", "📄 Legal"]
@@ -989,15 +981,19 @@ with tab_dash:
                         st.metric("🧠 AI Coins", stats["ai_balance"])
                         st.caption("Used for: Ask · Ideas · Analysis · Gate · Room")
                         if st.button("＋ Buy AI Coins", key="dash_buy_ai", use_container_width=True):
-                            st.session_state["_jump_to_coins"] = True
-                            st.rerun()
+                            st.session_state["_dash_show_buy"] = True
                 with _cw2:
                     with st.container(border=True):
                         st.metric("🎨 Studio Coins", stats["studio_balance"])
                         st.caption("Used for: Content Studio · Power Tools · Hashtags")
                         if st.button("＋ Buy Studio Coins", key="dash_buy_studio", use_container_width=True):
-                            st.session_state["_jump_to_coins"] = True
-                            st.rerun()
+                            st.session_state["_dash_show_buy"] = True
+                # ── Inline Buy Coins panel ───────────────────────────────────
+                if st.session_state.get("_dash_show_buy"):
+                    st.info("👇 Scroll down below or click the **💳 Buy Coins** tab above to top up your wallet.")
+                    if st.button("✕ Dismiss", key="dash_buy_dismiss"):
+                        st.session_state["_dash_show_buy"] = False
+
                 # ── Referral widget ──────────────────────────────────────────
                 from thinktank.engine.db import referral_stats
                 _ref_data = referral_stats(_dash_user)
