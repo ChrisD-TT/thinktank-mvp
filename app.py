@@ -1841,32 +1841,27 @@ with tab_studio:
     _sched_posts  = [c for c in (_all_content or []) if c.get("scheduled_for")]
     _repo_posts   = [c for c in (_all_content or []) if not c.get("scheduled_for")]
 
-    # Summary strip
-    _sc1, _sc2 = st.columns(2)
-    _sc1.metric("📅 Scheduled Posts", len(_sched_posts))
-    _sc2.metric("📬 My Posts Repository", len(_repo_posts))
+    _PLAT_ICONS = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵",
+                   "Instagram":"📸","Reddit":"👽","Facebook":"📘",
+                   "YouTube":"▶️","Threads":"🧵"}
+    _DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+
+    def _open_editor(content_id, label, plat):
+        if not _free_edits and _studio_bal < 1:
+            st.error("Need 1 Studio coin to open editor.")
+            return
+        if not _free_edits:
+            _sdb.studio_coin_spend(_studio_sid, 1)
+        st.session_state.sched_open = (label, plat, content_id)
+        st.session_state["scroll_to_editor"] = True
+        st.rerun()
 
     if not _all_content:
         st.caption("No content yet. Use the generator above to create your first post.")
     else:
-        _PLAT_ICONS = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵",
-                       "Instagram":"📸","Reddit":"👽","Facebook":"📘",
-                       "YouTube":"▶️","Threads":"🧵"}
-        _DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-
-        def _open_editor(content_id, label, plat):
-            if not _free_edits and _studio_bal < 1:
-                st.error("Need 1 Studio coin to open editor.")
-                return
-            if not _free_edits:
-                _sdb.studio_coin_spend(_studio_sid, 1)
-            st.session_state.sched_open = (label, plat, content_id)
-            st.session_state["scroll_to_editor"] = True
-            st.rerun()
-
-        # ── FOLDER 1: Scheduled Posts (day folders inside) ────────────────────
+        # ── SECTION 1: Scheduled Posts ────────────────────────────────────────
         if _sched_posts:
-            with st.expander(f"📅  Scheduled Posts  ({len(_sched_posts)})", expanded=False):
+            with st.expander(f"📅 Scheduled Posts ({len(_sched_posts)})", expanded=False):
                 _by_day = {}
                 for _c in _sched_posts:
                     try:
@@ -1879,43 +1874,40 @@ with tab_studio:
                     if _day not in _by_day:
                         continue
                     _day_items = _by_day[_day]
-                    # Each day is its own collapsible folder
-                    with st.expander(f"📌 {_day}  ({len(_day_items)} post{'s' if len(_day_items)>1 else ''})", expanded=False):
-                        for _c in _day_items:
-                            _ico = _PLAT_ICONS.get(_c["platform"], "📱")
-                            _prev = _c["content"][:60].replace("\n", " ") + "..."
-                            ca, cb = st.columns([5, 1])
-                            ca.markdown(f"{_ico} **{_c['platform']}**")
-                            ca.caption(_prev)
-                            with cb:
-                                if not _c["released"]:
-                                    st.caption("🔒 Locked")
-                                else:
-                                    if st.button("Edit", key=f"s_open_{_c['id']}", use_container_width=True):
-                                        _open_editor(_c["id"], _day, _c["platform"])
-                            st.markdown("---")
+                    st.markdown(f"**📌 {_day}** — {len(_day_items)} post{'s' if len(_day_items)>1 else ''}")
+                    for _c in _day_items:
+                        _ico = _PLAT_ICONS.get(_c["platform"], "📱")
+                        _prev = _c["content"][:100].replace("\n", " ") + ("…" if len(_c["content"]) > 100 else "")
+                        ca, cb = st.columns([6, 1])
+                        with ca:
+                            st.markdown(f"{_ico} **{_c['platform']}** · <span style='color:#888;font-size:0.82rem'>{_prev}</span>", unsafe_allow_html=True)
+                        with cb:
+                            if not _c["released"]:
+                                st.caption("🔒")
+                            else:
+                                if st.button("Edit", key=f"s_open_{_c['id']}", use_container_width=True):
+                                    _open_editor(_c["id"], _day, _c["platform"])
+                    st.divider()
 
-        # ── FOLDER 2: My Posts Repository (all generated posts, newest first) ─
+        # ── SECTION 2: My Posts Repository ───────────────────────────────────
         if _repo_posts:
-            with st.expander(f"📬  My Posts Repository  ({len(_repo_posts)})", expanded=False):
-                st.caption("All posts you've generated that aren't on a schedule. Your creative library.")
-                # Group by platform for easier navigation
+            with st.expander(f"📬 My Posts Repository ({len(_repo_posts)})", expanded=False):
                 _by_plat = {}
                 for _c in _repo_posts:
                     _by_plat.setdefault(_c["platform"], []).append(_c)
                 for _plat in sorted(_by_plat.keys()):
                     _plat_items = _by_plat[_plat]
                     _ico = _PLAT_ICONS.get(_plat, "📱")
-                    with st.expander(f"{_ico} {_plat}  ({len(_plat_items)})", expanded=False):
-                        for _c in sorted(_plat_items, key=lambda x: x["created_at"], reverse=True):
-                            _prev = _c["content"][:60].replace("\n", " ") + "..."
-                            ca, cb = st.columns([5, 1])
-                            ca.markdown(f"**{_c['tone']}** · {_c['created_at'][:10]}")
-                            ca.caption(_prev)
-                            with cb:
-                                if st.button("Edit", key=f"r_open_{_c['id']}", use_container_width=True):
-                                    _open_editor(_c["id"], _plat, _plat)
-                            st.markdown("---")
+                    st.markdown(f"**{_ico} {_plat}** — {len(_plat_items)} post{'s' if len(_plat_items)>1 else ''}")
+                    for _c in sorted(_plat_items, key=lambda x: x["created_at"], reverse=True):
+                        _prev = _c["content"][:100].replace("\n", " ") + ("…" if len(_c["content"]) > 100 else "")
+                        ca, cb = st.columns([6, 1])
+                        with ca:
+                            st.markdown(f"<span style='color:#888;font-size:0.78rem'>{_c['tone']} · {_c['created_at'][:10]}</span><br>{_prev}", unsafe_allow_html=True)
+                        with cb:
+                            if st.button("Edit", key=f"r_open_{_c['id']}", use_container_width=True):
+                                _open_editor(_c["id"], _plat, _plat)
+                    st.divider()
 
         # ── FOLDER 3: Download (per-section) ─────────────────────────────────
         with st.expander(f"📥  Download Your Work  ({_total_posts} posts)", expanded=False):
