@@ -1044,9 +1044,9 @@ with tab_dash:
                     if _buy_panel == "ai":
                         st.markdown("##### 🧠 Top Up AI Coins")
                         _ai_packs = [
-                            {"label": "Starter",  "coins": 25,  "price": "$4.99",  "desc": "Try all ThinkTank AI tools — Ask, Ideas, Analysis, Gate",          "price_id": _sec("STRIPE_PRICE_STARTER")},
-                            {"label": "Standard", "coins": 60,  "price": "$9.99",  "desc": "Heavy AI usage — great for daily content creators",                  "price_id": _sec("STRIPE_PRICE_STANDARD")},
-                            {"label": "Pro",      "coins": 150, "price": "$19.99", "desc": "Full AI suite — 2 weeks of content + analysis at full speed",        "price_id": _sec("STRIPE_PRICE_PRO")},
+                            {"label": "Starter",  "coins": 25,  "price": "$4.99",  "desc": "~25 questions asked or ~12 idea analyses — good for trying everything out", "price_id": _sec("STRIPE_PRICE_STARTER")},
+                            {"label": "Standard", "coins": 60,  "price": "$9.99",  "desc": "~60 questions or ~30 gate runs — solid for a week of regular use",         "price_id": _sec("STRIPE_PRICE_STANDARD")},
+                            {"label": "Pro",      "coins": 150, "price": "$19.99", "desc": "~150 questions or ~75 deep analyses — best value for power users",         "price_id": _sec("STRIPE_PRICE_PRO")},
                         ]
                         _bp1, _bp2, _bp3 = st.columns(3)
                         for _bpcol, _bpk in zip([_bp1, _bp2, _bp3], _ai_packs):
