@@ -458,8 +458,8 @@ with st.sidebar:
     st.caption("🔗 " + _share_url)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin, tab_legal = st.tabs(
-    ["💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin", "📄 Legal"]
+tab_dash, tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin, tab_legal = st.tabs(
+    ["🏠 My Dashboard", "💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin", "📄 Legal"]
 )
 
 # ==============================================================================
@@ -501,6 +501,216 @@ def _refund_coins(amount: int, reason: str = ""):
     """Refund coins on AI failure."""
     sid, db = _get_coin_session()
     db.coin_credit(sid, amount, f"refund-{sid}-{reason}")
+
+# ==============================================================================
+# DASHBOARD TAB
+# ==============================================================================
+with tab_dash:
+    from thinktank.engine.db import (
+        dashboard_get_layout, dashboard_save_layout, dashboard_get_stats
+    )
+
+    _dash_user = st.session_state.get("auth_user")
+
+    if not _dash_user:
+        # ── Not logged in ────────────────────────────────────────────────────
+        st.markdown(
+            """
+            <div style="text-align:center;padding:60px 20px;">
+                <div style="font-size:3rem;margin-bottom:12px;">🏠</div>
+                <div style="font-size:1.4rem;font-weight:700;margin-bottom:8px;">Your Personal Dashboard</div>
+                <div style="font-size:1rem;color:#666;max-width:480px;margin:0 auto 24px;">
+                    Log in or create a free account to see your coin balances, recent work,
+                    activity stats, and a fully customizable widget layout — all in one place.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.info("👈 Use the **Log in / Register** panel in the sidebar to get started.")
+    else:
+        # ── Logged-in dashboard ──────────────────────────────────────────────
+        _dash_stats = dashboard_get_stats(_dash_user)
+        _dash_layout = dashboard_get_layout(_dash_user)
+
+        # Customize mode toggle
+        _cust_col, _name_col = st.columns([1, 4])
+        with _name_col:
+            st.markdown(f"### 🏠 Welcome back, **{_dash_user.split('@')[0].title()}**")
+        with _cust_col:
+            _customize_mode = st.toggle("✏️ Customize", key="dash_customize_toggle", value=False)
+
+        st.divider()
+
+        # ── Widget definitions ───────────────────────────────────────────────
+        _WIDGET_META = {
+            "stats":        {"label": "📊 Activity Stats",       "desc": "Posts, ideas, and asks totals"},
+            "coins":        {"label": "🪙 Coin Balances",         "desc": "AI + Studio wallet balances and history"},
+            "recent_posts": {"label": "📝 Recent Posts",          "desc": "Last 5 posts you generated"},
+            "recent_ideas": {"label": "💡 Recent Ideas",          "desc": "Your latest saved ideas"},
+            "recent_asks":  {"label": "💬 Recent Conversations",  "desc": "Last Ask tab conversations"},
+            "quick_actions":{"label": "⚡ Quick Actions",         "desc": "One-click buttons to jump to any tool"},
+        }
+
+        # ── Customize panel ──────────────────────────────────────────────────
+        if _customize_mode:
+            st.markdown("#### ✏️ Customize Your Dashboard")
+            st.caption("Drag the widgets into your preferred order using the ↑ ↓ buttons, or hide ones you don't need.")
+
+            _new_order = list(_dash_layout)
+            for _wi, _wid in enumerate(_new_order):
+                _wm = _WIDGET_META.get(_wid, {"label": _wid, "desc": ""})
+                _wc1, _wc2, _wc3, _wc4 = st.columns([3, 1, 1, 1])
+                with _wc1:
+                    st.markdown(f"**{_wm['label']}** — {_wm['desc']}")
+                with _wc2:
+                    if _wi > 0:
+                        if st.button("↑", key=f"dash_up_{_wi}", use_container_width=True):
+                            _new_order[_wi], _new_order[_wi - 1] = _new_order[_wi - 1], _new_order[_wi]
+                            dashboard_save_layout(_dash_user, _new_order)
+                            st.rerun()
+                with _wc3:
+                    if _wi < len(_new_order) - 1:
+                        if st.button("↓", key=f"dash_dn_{_wi}", use_container_width=True):
+                            _new_order[_wi], _new_order[_wi + 1] = _new_order[_wi + 1], _new_order[_wi]
+                            dashboard_save_layout(_dash_user, _new_order)
+                            st.rerun()
+                with _wc4:
+                    if st.button("✕ Hide", key=f"dash_hide_{_wi}", use_container_width=True):
+                        _new_order.remove(_wid)
+                        dashboard_save_layout(_dash_user, _new_order)
+                        st.rerun()
+
+            # Show hidden widgets so user can restore them
+            _hidden = [w for w in _WIDGET_META if w not in _new_order]
+            if _hidden:
+                st.markdown("**Hidden widgets — click to restore:**")
+                _hcols = st.columns(len(_hidden))
+                for _hi, _hw in enumerate(_hidden):
+                    with _hcols[_hi]:
+                        _hm = _WIDGET_META[_hw]
+                        if st.button(f"＋ {_hm['label']}", key=f"dash_restore_{_hw}", use_container_width=True):
+                            _new_order.append(_hw)
+                            dashboard_save_layout(_dash_user, _new_order)
+                            st.rerun()
+
+            if st.button("↩️ Reset to Default Layout", key="dash_reset_layout"):
+                dashboard_save_layout(_dash_user, list(dashboard_get_layout.__globals__["_DEFAULT_LAYOUT"]))
+                st.rerun()
+
+            st.divider()
+
+        # ── Render widgets in saved order ────────────────────────────────────
+        def _render_dash_widget(wid: str, stats: dict):
+            if wid == "stats":
+                st.markdown("#### 📊 Activity Stats")
+                _s1, _s2, _s3, _s4 = st.columns(4)
+                _s1.metric("Posts Generated",  stats["posts_total"])
+                _s2.metric("Posts This Week",   stats["posts_week"])
+                _s3.metric("Ideas Saved",        stats["ideas_total"])
+                _s4.metric("Questions Asked",    stats["asks_total"])
+                _s5, _s6, _, _ = st.columns(4)
+                _s5.metric("🧠 AI Coins Used",      stats["ai_spent"])
+                _s6.metric("🎨 Studio Coins Used",   stats["studio_spent"])
+
+            elif wid == "coins":
+                st.markdown("#### 🪙 Coin Wallets")
+                _cw1, _cw2 = st.columns(2)
+                with _cw1:
+                    with st.container(border=True):
+                        st.metric("🧠 AI Coins", stats["ai_balance"])
+                        st.caption("Used for: Ask · Ideas · Analysis · Gate · Room")
+                        if st.button("＋ Buy AI Coins", key="dash_buy_ai", use_container_width=True):
+                            st.query_params["tab"] = "coins"
+                            st.rerun()
+                with _cw2:
+                    with st.container(border=True):
+                        st.metric("🎨 Studio Coins", stats["studio_balance"])
+                        st.caption("Used for: Content Studio · Power Tools · Hashtags")
+                        if st.button("＋ Buy Studio Coins", key="dash_buy_studio", use_container_width=True):
+                            st.query_params["tab"] = "coins"
+                            st.rerun()
+                # Mini coin history
+                if stats["recent_txns"]:
+                    st.caption("Recent AI coin activity:")
+                    for _tx in stats["recent_txns"][:5]:
+                        _sign = "+" if _tx["amount"] > 0 else ""
+                        _clr  = "🟢" if _tx["amount"] > 0 else "🔴"
+                        _lbl  = {"welcome":"🎁 Welcome","purchase":"💳 Purchase",
+                                 "spend":"💨 Spent","merge":"🔀 Merge",
+                                 "refund":"↩ Refund","admin-grant":"✅ Grant"}.get(_tx["type"], _tx["type"])
+                        st.caption(f"{_clr} {_lbl} · {_sign}{_tx['amount']} · {_tx['created_at'][:10]}")
+
+            elif wid == "recent_posts":
+                st.markdown("#### 📝 Recent Posts")
+                if stats["recent_posts"]:
+                    _PLAT_ICONS = {
+                        "Twitter/X":"𝕏", "LinkedIn":"in", "Instagram":"📸",
+                        "TikTok":"🎵", "Facebook":"fb", "Threads":"🧵",
+                        "YouTube":"▶️", "Reddit":"🟠"
+                    }
+                    for _rp in stats["recent_posts"]:
+                        with st.container(border=True):
+                            _icon = _PLAT_ICONS.get(_rp["platform"], "📄")
+                            st.markdown(f"**{_icon} {_rp['platform']}** · `{_rp['topic'][:60]}`")
+                            st.caption(_rp["content"][:200] + ("…" if len(_rp["content"]) > 200 else ""))
+                            st.caption(f"Generated {_rp['created_at'][:10]}")
+                else:
+                    st.caption("No posts generated yet. Head to 📱 Content Studio to create your first post.")
+
+            elif wid == "recent_ideas":
+                st.markdown("#### 💡 Recent Ideas")
+                _r_ideas = list_ideas(limit=5)
+                if _r_ideas:
+                    for _ri in _r_ideas:
+                        with st.container(border=True):
+                            _ic1, _ic2 = st.columns([5, 1])
+                            with _ic1:
+                                st.markdown(f"**#{_ri['id']}** {_ri['text'][:120]}")
+                                st.caption(_ri["created_at"][:10])
+                            with _ic2:
+                                if st.button("Open", key=f"dash_open_idea_{_ri['id']}", use_container_width=True):
+                                    st.session_state.selected_idea_id = _ri["id"]
+                                    st.rerun()
+                else:
+                    st.caption("No ideas saved yet. Head to 💡 Ideas to add your first one.")
+
+            elif wid == "recent_asks":
+                st.markdown("#### 💬 Recent Conversations")
+                _r_chats = chat_list(limit=5)
+                if _r_chats:
+                    for _rc in _r_chats:
+                        with st.container(border=True):
+                            st.markdown(f"**{_rc['title']}**")
+                            st.caption(_rc["created_at"][:10])
+                else:
+                    st.caption("No conversations yet. Head to 💬 Ask to start thinking.")
+
+            elif wid == "quick_actions":
+                st.markdown("#### ⚡ Quick Actions")
+                st.caption("Jump straight into any tool.")
+                _qa1, _qa2, _qa3 = st.columns(3)
+                with _qa1:
+                    with st.container(border=True):
+                        st.markdown("**💬 Ask ThinkTank**")
+                        st.caption("Get a decision, strategy, or second opinion instantly.")
+                        st.markdown("→ Click **Ask** tab above")
+                with _qa2:
+                    with st.container(border=True):
+                        st.markdown("**📱 Generate Content**")
+                        st.caption("Write a post for any platform in seconds.")
+                        st.markdown("→ Click **Content Studio** tab above")
+                with _qa3:
+                    with st.container(border=True):
+                        st.markdown("**🚦 Gate an Idea**")
+                        st.caption("Score your next move before you commit.")
+                        st.markdown("→ Click **Gate** tab above")
+
+        # Render each widget in order
+        for _w in _dash_layout:
+            if _w in _WIDGET_META:
+                _render_dash_widget(_w, _dash_stats)
+                st.divider()
 
 # ==============================================================================
 # IDEAS TAB

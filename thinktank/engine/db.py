@@ -127,6 +127,12 @@ CREATE TABLE IF NOT EXISTS sale_promo_codes (
     expires_at     TEXT,
     created_at     TEXT    NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS dashboard_prefs (
+    email      TEXT PRIMARY KEY,
+    layout     TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -941,3 +947,108 @@ def sale_promo_toggle(code_id: int, active: bool) -> None:
             "UPDATE sale_promo_codes SET active=? WHERE id=?",
             (1 if active else 0, code_id)
         )
+
+
+# -- Dashboard Preferences ----------------------------------------------------
+
+_DEFAULT_LAYOUT = [
+    "stats",
+    "coins",
+    "recent_posts",
+    "recent_ideas",
+    "recent_asks",
+    "quick_actions",
+]
+
+
+def dashboard_get_layout(email: str) -> list:
+    """Return the user's saved widget order. Falls back to default layout."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS dashboard_prefs "
+            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)"
+        )
+        row = con.execute(
+            "SELECT layout FROM dashboard_prefs WHERE email=?", (email,)
+        ).fetchone()
+    if not row or not row[0] or row[0] == "[]":
+        return list(_DEFAULT_LAYOUT)
+    try:
+        saved = json.loads(row[0])
+        # Merge: keep saved order, append any new widgets not yet in saved list
+        merged = [w for w in saved if w in _DEFAULT_LAYOUT]
+        for w in _DEFAULT_LAYOUT:
+            if w not in merged:
+                merged.append(w)
+        return merged
+    except Exception:
+        return list(_DEFAULT_LAYOUT)
+
+
+def dashboard_save_layout(email: str, layout: list) -> None:
+    """Persist the user's widget order."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS dashboard_prefs "
+            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)"
+        )
+        con.execute(
+            "INSERT INTO dashboard_prefs(email, layout, updated_at) VALUES(?,?,?) "
+            "ON CONFLICT(email) DO UPDATE SET layout=excluded.layout, updated_at=excluded.updated_at",
+            (email, json.dumps(layout), _utc()),
+        )
+
+
+def dashboard_get_stats(email: str) -> dict:
+    """Return aggregate usage stats for a user's dashboard."""
+    with sqlite3.connect(DB_PATH) as con:
+        ai_bal = (con.execute(
+            "SELECT coins FROM coin_users WHERE session_id=?", (email,)
+        ).fetchone() or (0,))[0]
+        studio_bal = (con.execute(
+            "SELECT coins FROM studio_coin_users WHERE session_id=?", (email,)
+        ).fetchone() or (0,))[0]
+        posts_total = (con.execute(
+            "SELECT COUNT(*) FROM studio_content WHERE session_id=?", (email,)
+        ).fetchone() or (0,))[0]
+        posts_week = (con.execute(
+            "SELECT COUNT(*) FROM studio_content WHERE session_id=? "
+            "AND created_at >= datetime('now','-7 days')", (email,)
+        ).fetchone() or (0,))[0]
+        ideas_total = (con.execute(
+            "SELECT COUNT(*) FROM ideas"
+        ).fetchone() or (0,))[0]
+        asks_total = (con.execute(
+            "SELECT COUNT(*) FROM chat_messages WHERE role='user'"
+        ).fetchone() or (0,))[0]
+        ai_spent = (con.execute(
+            "SELECT COALESCE(SUM(ABS(amount)),0) FROM coin_transactions "
+            "WHERE session_id=? AND type='spend'", (email,)
+        ).fetchone() or (0,))[0]
+        studio_spent = (con.execute(
+            "SELECT COALESCE(SUM(ABS(amount)),0) FROM studio_coin_transactions "
+            "WHERE session_id=? AND type='spend'", (email,)
+        ).fetchone() or (0,))[0]
+        recent_posts = con.execute(
+            "SELECT platform, topic, content, created_at FROM studio_content "
+            "WHERE session_id=? ORDER BY id DESC LIMIT 5", (email,)
+        ).fetchall()
+        recent_txns = con.execute(
+            "SELECT type, amount, created_at FROM coin_transactions "
+            "WHERE session_id=? ORDER BY id DESC LIMIT 8", (email,)
+        ).fetchall()
+    return {
+        "ai_balance":    ai_bal,
+        "studio_balance": studio_bal,
+        "posts_total":   posts_total,
+        "posts_week":    posts_week,
+        "ideas_total":   ideas_total,
+        "asks_total":    asks_total,
+        "ai_spent":      ai_spent,
+        "studio_spent":  studio_spent,
+        "recent_posts":  [{"platform": r[0], "topic": r[1],
+                           "content": r[2], "created_at": r[3]}
+                          for r in recent_posts],
+        "recent_txns":   [{"type": r[0], "amount": r[1], "created_at": r[2]}
+                          for r in recent_txns],
+    }
