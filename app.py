@@ -28,7 +28,12 @@ import thinktank.engine.db as _gdb_mod
 import uuid as _uuid_mod
 _gdb_mod.init_db()
 
-# 1. URL param is the source of truth
+# 1. Capture referral code from URL before anything else
+_url_ref_code = st.query_params.get("ref", "")
+if _url_ref_code and "pending_ref_code" not in st.session_state:
+    st.session_state["pending_ref_code"] = _url_ref_code.strip().lower()
+
+# 2. URL param is the source of truth
 _url_sid = st.query_params.get("sid", "")
 if _url_sid:
     # Valid sid in URL — always use it
@@ -372,14 +377,20 @@ with st.sidebar:
                         st.error(_res["error"])
             else:
                 if st.button("Create account", key="do_register", type="primary", use_container_width=True):
-                    _res = user_register(_auth_email, _auth_pw)
+                    from thinktank.engine.db import user_register_with_referral
+                    _pending_ref = st.session_state.get("pending_ref_code", "")
+                    _res = user_register_with_referral(_auth_email, _auth_pw, _pending_ref)
                     if _res["ok"]:
                         _anon = st.session_state.get("_GLOBAL_SID", "")
                         if _anon:
                             user_merge_session(_res["email"], _anon)
                         _gdb_mod.sid_save_auth(_GLOBAL_SID, _res["email"])
                         st.session_state.auth_user = _res["email"]
-                        st.success("Account created! Welcome 🎉")
+                        if _pending_ref:
+                            st.success("Account created! Welcome 🎉 +5 bonus coins added from your referral link!")
+                            st.session_state.pop("pending_ref_code", None)
+                        else:
+                            st.success("Account created! Welcome 🎉")
                         st.rerun()
                     else:
                         st.error(_res["error"])
@@ -456,6 +467,13 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.caption("🔗 " + _share_url)
+
+# ── Jump to Buy Coins tab via JS if flagged ───────────────────────────────────
+if st.session_state.pop("_jump_to_coins", False):
+    st.markdown(
+        "<script>window.parent.document.querySelectorAll('[data-baseweb=\"tab\"]')[7].click();</script>",
+        unsafe_allow_html=True,
+    )
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_dash, tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin, tab_legal = st.tabs(
@@ -970,15 +988,27 @@ with tab_dash:
                         st.metric("🧠 AI Coins", stats["ai_balance"])
                         st.caption("Used for: Ask · Ideas · Analysis · Gate · Room")
                         if st.button("＋ Buy AI Coins", key="dash_buy_ai", use_container_width=True):
-                            st.query_params["tab"] = "coins"
+                            st.session_state["_jump_to_coins"] = True
                             st.rerun()
                 with _cw2:
                     with st.container(border=True):
                         st.metric("🎨 Studio Coins", stats["studio_balance"])
                         st.caption("Used for: Content Studio · Power Tools · Hashtags")
                         if st.button("＋ Buy Studio Coins", key="dash_buy_studio", use_container_width=True):
-                            st.query_params["tab"] = "coins"
+                            st.session_state["_jump_to_coins"] = True
                             st.rerun()
+                # ── Referral widget ──────────────────────────────────────────
+                from thinktank.engine.db import referral_stats
+                _ref_data = referral_stats(_dash_user)
+                st.markdown("---")
+                st.markdown("#### 🔗 Your Referral Link")
+                _ref_c1, _ref_c2, _ref_c3 = st.columns(3)
+                _ref_c1.metric("Friends Referred", _ref_data["referral_count"])
+                _ref_c2.metric("Coins Earned", _ref_data["coins_earned"])
+                _ref_c3.metric("Coins per Referral", "10")
+                st.code(_ref_data["referral_url"], language=None)
+                st.caption("Share this link. When someone registers through it, **they get 5 free AI coins** and **you get 10 free AI coins** — automatically.")
+
                 # Mini coin history
                 if stats["recent_txns"]:
                     st.caption("Recent AI coin activity:")
@@ -2543,6 +2573,19 @@ with tab_coins:
                         st.session_state["promo_discount"] = 0.35
                         st.success("✅ Promo code applied! You'll get 35% off your next purchase. Select a pack above to buy.")
 
+        # ── Referral section in Buy Coins ─────────────────────────────────────
+        if st.session_state.auth_user:
+            st.divider()
+            st.markdown("### 🔗 Refer a Friend — Earn Free Coins")
+            from thinktank.engine.db import referral_stats as _ref_stats_fn
+            _bc_ref = _ref_stats_fn(st.session_state.auth_user)
+            _rfa, _rfb, _rfc = st.columns(3)
+            _rfa.metric("Friends Referred", _bc_ref["referral_count"])
+            _rfb.metric("AI Coins Earned", _bc_ref["coins_earned"])
+            _rfc.metric("Per Referral", "+10 you / +5 them")
+            st.code(_bc_ref["referral_url"], language=None)
+            st.caption("Share this link anywhere. Coins are awarded the moment they create their account.")
+
         # ── Show current plan + promo if logged in ────────────────────────────
         if st.session_state.auth_user:
             _up = user_get_plan(st.session_state.auth_user)
@@ -2946,7 +2989,24 @@ with tab_admin:
         except Exception as _txe:
             st.error(f"Transaction history error: {_txe}")
 
-    
+        st.divider()
+
+        # ── Referral Leaderboard ──────────────────────────────────────────────
+        st.markdown("### 🏆 Referral Leaderboard")
+        st.caption("Top users by number of friends referred. Each referral = 10 AI coins earned.")
+        try:
+            from thinktank.engine.db import referral_leaderboard as _ref_lb
+            _lb_rows = _ref_lb(20)
+            if _lb_rows:
+                for _ri, _rr in enumerate(_lb_rows):
+                    _medal = ["🥇","🥈","🥉"][_ri] if _ri < 3 else f"#{_ri+1}"
+                    st.markdown(f"{_medal} **{_rr['email']}** — {_rr['referrals']} referrals · {_rr['coins_earned']} coins earned")
+            else:
+                st.caption("No referrals recorded yet.")
+        except Exception as _lbe:
+            st.error(f"Leaderboard error: {_lbe}")
+
+
 # ==============================================================================
 # LEGAL TAB
 # ==============================================================================

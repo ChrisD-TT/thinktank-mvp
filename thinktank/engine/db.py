@@ -135,6 +135,15 @@ CREATE TABLE IF NOT EXISTS dashboard_prefs (
     theme_custom TEXT,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS referrals (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    referrer_email TEXT NOT NULL,
+    referee_email  TEXT NOT NULL UNIQUE,
+    ref_code       TEXT NOT NULL,
+    rewarded       INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL
+);
 """
 
 
@@ -403,6 +412,14 @@ def user_register(email: str, password: str) -> dict:
             return {"ok": True, "user_id": user_id, "email": email}
     except sqlite3.IntegrityError:
         return {"ok": False, "error": "An account with that email already exists."}
+
+
+def user_register_with_referral(email: str, password: str, ref_code: str) -> dict:
+    """Register and immediately process a referral code if valid."""
+    result = user_register(email, password)
+    if result["ok"] and ref_code:
+        referral_use(ref_code.strip().lower(), email.strip().lower())
+    return result
 
 
 def user_login(email: str, password: str) -> dict:
@@ -1089,3 +1106,107 @@ def dashboard_get_stats(email: str) -> dict:
         "recent_txns":   [{"type": r[0], "amount": r[1], "created_at": r[2]}
                           for r in recent_txns],
     }
+
+
+# -- Referral Program ----------------------------------------------------------
+
+def referral_code_for(email: str) -> str:
+    """Return (or generate) the unique referral code for a user.
+    Code is derived from the email so it's stable and never needs storing separately."""
+    import hashlib
+    return hashlib.md5(email.strip().lower().encode()).hexdigest()[:8]
+
+
+def referral_use(ref_code: str, referee_email: str) -> dict:
+    """Record a referral and grant coins to both parties.
+    referrer gets 10 AI coins, referee gets 5 AI coins.
+    Returns {'ok': True} or {'ok': False, 'error': ...}
+    """
+    ref_code = ref_code.strip().lower()
+    referee_email = referee_email.strip().lower()
+
+    # Find which user owns this code
+    with sqlite3.connect(DB_PATH) as con:
+        rows = con.execute("SELECT email FROM users").fetchall()
+
+    referrer_email = None
+    for (em,) in rows:
+        if referral_code_for(em) == ref_code:
+            referrer_email = em
+            break
+
+    if not referrer_email:
+        return {"ok": False, "error": "Invalid referral code."}
+    if referrer_email == referee_email:
+        return {"ok": False, "error": "Cannot refer yourself."}
+
+    with sqlite3.connect(DB_PATH) as con:
+        # Check not already referred
+        existing = con.execute(
+            "SELECT id FROM referrals WHERE referee_email=?", (referee_email,)
+        ).fetchone()
+        if existing:
+            return {"ok": False, "error": "Already referred."}
+
+        # Insert referral record
+        con.execute(
+            "INSERT INTO referrals(referrer_email, referee_email, ref_code, rewarded, created_at) "
+            "VALUES (?, ?, ?, 1, ?)",
+            (referrer_email, referee_email, ref_code, _utc()),
+        )
+
+        # Grant 10 AI coins to referrer
+        _ensure_coin_wallet(con, referrer_email)
+        con.execute(
+            "UPDATE coin_users SET coins = coins + 10 WHERE session_id=?",
+            (referrer_email,),
+        )
+        con.execute(
+            "INSERT INTO coin_transactions(session_id, type, amount, stripe_session, created_at) "
+            "VALUES (?, 'referral-reward', 10, ?, ?)",
+            (referrer_email, f"ref-{referee_email}", _utc()),
+        )
+
+        # Grant 5 AI coins to referee (new user)
+        _ensure_coin_wallet(con, referee_email)
+        con.execute(
+            "UPDATE coin_users SET coins = coins + 5 WHERE session_id=?",
+            (referee_email,),
+        )
+        con.execute(
+            "INSERT INTO coin_transactions(session_id, type, amount, stripe_session, created_at) "
+            "VALUES (?, 'referral-bonus', 5, ?, ?)",
+            (referee_email, f"ref-from-{referrer_email}", _utc()),
+        )
+
+    return {"ok": True, "referrer": referrer_email}
+
+
+def referral_stats(email: str) -> dict:
+    """Return referral stats for a user: their code, how many referrals, coins earned."""
+    code = referral_code_for(email)
+    with sqlite3.connect(DB_PATH) as con:
+        count = con.execute(
+            "SELECT COUNT(*) FROM referrals WHERE referrer_email=? AND rewarded=1",
+            (email,),
+        ).fetchone()[0]
+    return {
+        "code": code,
+        "referral_url": f"https://www.thinktankapp.net?ref={code}",
+        "referral_count": count,
+        "coins_earned": count * 10,
+    }
+
+
+def referral_leaderboard(limit: int = 20) -> list:
+    """Return top referrers for admin view."""
+    with sqlite3.connect(DB_PATH) as con:
+        rows = con.execute(
+            """SELECT referrer_email, COUNT(*) as cnt
+               FROM referrals WHERE rewarded=1
+               GROUP BY referrer_email
+               ORDER BY cnt DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [{"email": r[0], "referrals": r[1], "coins_earned": r[1] * 10} for r in rows]
