@@ -470,9 +470,14 @@ with st.sidebar:
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 _TAB_LABELS = ["🏠 My Dashboard", "💬 Ask", "💡 Ideas", "📊 Analysis", "🚦 Gate", "🎲 Room", "📱 Content Studio", "💳 Buy Coins", "⚙️ Admin", "📄 Legal"]
-_default_tab = st.session_state.pop("_goto_tab", _TAB_LABELS[0])
+
+# Allow any code to navigate to a tab by writing:
+#   st.session_state["main_tabs"] = "💳 Buy Coins"; st.rerun()
+# st.tabs with key= + on_change="rerun" lets session_state[key] control the active tab.
 tab_dash, tab_ask, tab_ideas, tab_analysis, tab_gate, tab_room, tab_studio, tab_coins, tab_admin, tab_legal = st.tabs(
-    _TAB_LABELS, default=_default_tab
+    _TAB_LABELS,
+    key="main_tabs",
+    on_change="rerun",
 )
 
 # ==============================================================================
@@ -983,14 +988,14 @@ with tab_dash:
                         st.metric("🧠 AI Coins", stats["ai_balance"])
                         st.caption("Used for: Ask · Ideas · Analysis · Gate · Room")
                         if st.button("＋ Buy AI Coins", key="dash_buy_ai", use_container_width=True):
-                            st.session_state["_goto_tab"] = "💳 Buy Coins"
+                            st.session_state["main_tabs"] = "💳 Buy Coins"
                             st.rerun()
                 with _cw2:
                     with st.container(border=True):
                         st.metric("🎨 Studio Coins", stats["studio_balance"])
                         st.caption("Used for: Content Studio · Power Tools · Hashtags")
                         if st.button("＋ Buy Studio Coins", key="dash_buy_studio", use_container_width=True):
-                            st.session_state["_goto_tab"] = "💳 Buy Coins"
+                            st.session_state["main_tabs"] = "💳 Buy Coins"
                             st.rerun()
 
                 # ── Referral widget ──────────────────────────────────────────
