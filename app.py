@@ -836,34 +836,18 @@ with tab_dash:
                 _tm = _STOCK_THEMES[_tk]
                 with _tcols[_ti % 4]:
                     _is_active = (_dash_theme["theme"] == _tk)
-                    _border = "3px solid #3b82d4" if _is_active else "1px solid #334"
+                    _border = "3px solid #3b82d4" if _is_active else "1px solid #444"
                     _preview_grad = _tm.get("preview", "linear-gradient(135deg,#f0f4ff,#ffffff)")
                     _preview_text = _tm.get("preview_text", "#1f2328")
-                    _active_badge = (
-                        '<div style="position:absolute;top:6px;right:8px;'
-                        'background:#3b82d4;color:#fff;font-size:0.62rem;'
-                        'padding:2px 7px;border-radius:20px;font-weight:700;">✓ Active</div>'
-                        if _is_active else ""
-                    )
+                    _active_txt = " ✓" if _is_active else ""
                     st.markdown(
-                        f"""<div style="position:relative;border:{_border};border-radius:10px;
-                                        overflow:hidden;margin-bottom:6px;">
-                                <div style="background:{_preview_grad};
-                                            padding:18px 12px 12px;min-height:70px;
-                                            display:flex;flex-direction:column;justify-content:flex-end;">
-                                    {_active_badge}
-                                    <div style="font-size:0.82rem;font-weight:700;
-                                                color:{_preview_text};
-                                                text-shadow:0 1px 3px rgba(0,0,0,0.6);">
-                                        {_tm['label']}
-                                    </div>
-                                </div>
-                                <div style="background:#1a1a2e;padding:8px 12px;">
-                                    <div style="font-size:0.70rem;color:#9aa5b4;line-height:1.4;">
-                                        {_tm['desc']}
-                                    </div>
-                                </div>
-                            </div>""",
+                        f'<p style="background:{_preview_grad};border:{_border};'
+                        f'border-radius:10px;padding:14px 12px 10px;margin-bottom:4px;'
+                        f'font-size:0.82rem;font-weight:700;color:{_preview_text};'
+                        f'text-shadow:0 1px 4px rgba(0,0,0,0.7);line-height:1.5;">'
+                        f'{_tm["label"]}{_active_txt}<br>'
+                        f'<span style="font-size:0.68rem;font-weight:400;opacity:0.85;">'
+                        f'{_tm["desc"]}</span></p>',
                         unsafe_allow_html=True,
                     )
                     if not _is_active:
