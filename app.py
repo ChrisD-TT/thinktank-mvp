@@ -1044,9 +1044,9 @@ with tab_dash:
                     if _buy_panel == "ai":
                         st.markdown("##### 🧠 Top Up AI Coins")
                         _ai_packs = [
-                            {"label": "Starter",  "coins": 25,  "price": "$4.99",  "price_id": _sec("STRIPE_PRICE_STARTER")},
-                            {"label": "Standard", "coins": 60,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STANDARD")},
-                            {"label": "Pro",      "coins": 150, "price": "$19.99", "price_id": _sec("STRIPE_PRICE_PRO")},
+                            {"label": "Starter",  "coins": 25,  "price": "$4.99",  "desc": "Try all ThinkTank AI tools — Ask, Ideas, Analysis, Gate",          "price_id": _sec("STRIPE_PRICE_STARTER")},
+                            {"label": "Standard", "coins": 60,  "price": "$9.99",  "desc": "Heavy AI usage — great for daily content creators",                  "price_id": _sec("STRIPE_PRICE_STANDARD")},
+                            {"label": "Pro",      "coins": 150, "price": "$19.99", "desc": "Full AI suite — 2 weeks of content + analysis at full speed",        "price_id": _sec("STRIPE_PRICE_PRO")},
                         ]
                         _bp1, _bp2, _bp3 = st.columns(3)
                         for _bpcol, _bpk in zip([_bp1, _bp2, _bp3], _ai_packs):
@@ -1054,6 +1054,7 @@ with tab_dash:
                                 with st.container(border=True):
                                     st.markdown(f"**{_bpk['label']}**")
                                     st.markdown(f"🪙 {_bpk['coins']} coins")
+                                    st.caption(_bpk['desc'])
                                     st.markdown(f"**{_bpk['price']}**")
                                     if st.button(f"Buy {_bpk['label']}", key=f"dash_ai_buy_{_bpk['label']}", use_container_width=True, type="primary"):
                                         if not st.session_state.auth_user:
@@ -1071,9 +1072,9 @@ with tab_dash:
                     else:
                         st.markdown("##### 🎨 Top Up Studio Coins")
                         _studio_packs = [
-                            {"label": "Studio Starter", "coins": 20,  "price": "$15",  "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER")},
-                            {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
-                            {"label": "Studio Max",     "coins": 700, "price": "$700", "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
+                            {"label": "Studio Starter", "coins": 20,  "price": "$15",  "desc": "Posts · Hashtags · TikTok scripts · 15% multi-platform discount", "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER")},
+                            {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "desc": "All Starter features + free content edits included",               "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
+                            {"label": "Studio Max",     "coins": 700, "price": "$700", "desc": "Unlimited Studio · Permanent free edits · 35% promo code",         "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
                         ]
                         _bsp1, _bsp2, _bsp3 = st.columns(3)
                         for _bspcol, _bspk in zip([_bsp1, _bsp2, _bsp3], _studio_packs):
@@ -1081,6 +1082,7 @@ with tab_dash:
                                 with st.container(border=True):
                                     st.markdown(f"**{_bspk['label']}**")
                                     st.markdown(f"🪙 {_bspk['coins']} coins")
+                                    st.caption(_bspk['desc'])
                                     st.markdown(f"**{_bspk['price']}**")
                                     if st.button(f"Buy", key=f"dash_studio_buy_{_bspk['label'].replace(' ','_')}", use_container_width=True, type="primary"):
                                         if not st.session_state.auth_user:
