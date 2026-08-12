@@ -1072,9 +1072,9 @@ with tab_dash:
                     else:
                         st.markdown("##### 🎨 Top Up Studio Coins")
                         _studio_packs = [
-                            {"label": "Studio Starter", "coins": 20,  "price": "$15",  "desc": "Posts · Hashtags · TikTok scripts · 15% multi-platform discount", "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER")},
-                            {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "desc": "All Starter features + free content edits included",               "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
-                            {"label": "Studio Max",     "coins": 700, "price": "$700", "desc": "Unlimited Studio · Permanent free edits · 35% promo code",         "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
+                            {"label": "Studio Starter", "coins": 20,  "price": "$15",  "desc": "Posts · Hashtags · TikTok scripts · 15% multi-platform discount",        "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER")},
+                            {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "desc": "All Starter features · 3-coin edits · free edits while coins last",       "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
+                            {"label": "Studio Max",     "coins": 700, "price": "$700", "desc": "Unlimited Studio · Free edits for life · 35% promo code · best value",   "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
                         ]
                         _bsp1, _bsp2, _bsp3 = st.columns(3)
                         for _bspcol, _bspk in zip([_bsp1, _bsp2, _bsp3], _studio_packs):
@@ -1593,7 +1593,10 @@ with tab_studio:
     # check if user has free edits based on plan tier
     from thinktank.engine.db import user_get_plan, FREE_EDIT_TIERS
     _user_plan = user_get_plan(st.session_state.auth_user) if st.session_state.auth_user else {"plan_tier": "free"}
-    _free_edits = _user_plan["plan_tier"] in FREE_EDIT_TIERS
+    # Free edits apply only while the user still has coins — once depleted, edits cost coins again.
+    # studio_max is the only tier with truly permanent free edits (large coin pool).
+    # studio_2week gets free edits only while their 250 coins last.
+    _free_edits = (_user_plan["plan_tier"] in FREE_EDIT_TIERS) and (_studio_bal > 0)
 
     st.subheader("📱 Content Studio")
     st.caption("AI-generated social media content. Coins are charged per generation.")
