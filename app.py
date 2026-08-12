@@ -503,11 +503,190 @@ def _refund_coins(amount: int, reason: str = ""):
     db.coin_credit(sid, amount, f"refund-{sid}-{reason}")
 
 # ==============================================================================
+# DASHBOARD THEME ENGINE
+# ==============================================================================
+
+# Stock themes — each defines CSS variables injected onto [data-testid="stAppViewContainer"]
+_STOCK_THEMES = {
+    "default": {
+        "label": "⚪ Default",
+        "desc":  "Clean white — the ThinkTank standard",
+        "css": "",   # no override — uses Streamlit default
+    },
+    "midnight": {
+        "label": "🌑 Midnight",
+        "desc":  "Deep navy dark mode, electric blue accents",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: #0a0f1e !important;
+                color: #e8eaf6 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #90caf9 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #cfd8dc !important; }
+            [data-testid="stMetric"] { background: #0d1b2a !important; border-radius:8px; padding:8px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#0d1b2a !important; border-color:#1e3a5f !important; }
+            .stTabs [data-baseweb="tab-list"] { background:#0d1b2a !important; }
+            .stTabs [data-baseweb="tab"] { color:#90caf9 !important; }
+            [data-testid="stSidebar"] { background:#060c18 !important; }
+        """,
+    },
+    "forest": {
+        "label": "🌲 Forest",
+        "desc":  "Deep green, warm amber highlights",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: #0d1f0f !important;
+                color: #e8f5e9 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #a5d6a7 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #c8e6c9 !important; }
+            [data-testid="stMetric"] { background: #132b14 !important; border-radius:8px; padding:8px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#132b14 !important; border-color:#2e7d32 !important; }
+            .stTabs [data-baseweb="tab-list"] { background:#0a180b !important; }
+            .stTabs [data-baseweb="tab"] { color:#a5d6a7 !important; }
+            [data-testid="stSidebar"] { background:#071008 !important; }
+        """,
+    },
+    "sunset": {
+        "label": "🌅 Sunset",
+        "desc":  "Warm orange-to-crimson gradient feel",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: #1a0a00 !important;
+                color: #fff3e0 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #ffb74d !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #ffe0b2 !important; }
+            [data-testid="stMetric"] { background: #2c1200 !important; border-radius:8px; padding:8px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#2c1200 !important; border-color:#e65100 !important; }
+            .stTabs [data-baseweb="tab-list"] { background:#1a0800 !important; }
+            .stTabs [data-baseweb="tab"] { color:#ffb74d !important; }
+            [data-testid="stSidebar"] { background:#110600 !important; }
+        """,
+    },
+    "arctic": {
+        "label": "❄️ Arctic",
+        "desc":  "Icy blue-white, ultra-clean minimal",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: #e8f4fd !important;
+                color: #0d2137 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #01579b !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #1a3c5e !important; }
+            [data-testid="stMetric"] { background: #daeeff !important; border-radius:8px; padding:8px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#daeeff !important; border-color:#90caf9 !important; }
+            .stTabs [data-baseweb="tab-list"] { background:#c9e8fb !important; }
+            .stTabs [data-baseweb="tab"] { color:#01579b !important; }
+            [data-testid="stSidebar"] { background:#c5e3f7 !important; }
+        """,
+    },
+    "rose_gold": {
+        "label": "🌹 Rose Gold",
+        "desc":  "Elegant blush-pink and soft gold tones",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: #1a0d10 !important;
+                color: #fce4ec !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #f48fb1 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #f8bbd0 !important; }
+            [data-testid="stMetric"] { background: #2c1018 !important; border-radius:8px; padding:8px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#2c1018 !important; border-color:#c2185b !important; }
+            .stTabs [data-baseweb="tab-list"] { background:#1a0810 !important; }
+            .stTabs [data-baseweb="tab"] { color:#f48fb1 !important; }
+            [data-testid="stSidebar"] { background:#12060c !important; }
+        """,
+    },
+    "neon": {
+        "label": "⚡ Neon",
+        "desc":  "Pure black with neon green cyber accents",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: #000000 !important;
+                color: #e0e0e0 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #39ff14 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #b0b0b0 !important; }
+            [data-testid="stMetric"] { background: #0a0a0a !important; border:1px solid #39ff14 !important; border-radius:8px; padding:8px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#0a0a0a !important; border-color:#39ff14 !important; }
+            .stTabs [data-baseweb="tab-list"] { background:#000 !important; }
+            .stTabs [data-baseweb="tab"] { color:#39ff14 !important; }
+            [data-testid="stSidebar"] { background:#000 !important; }
+        """,
+    },
+    "purple_haze": {
+        "label": "💜 Purple Haze",
+        "desc":  "Deep violet with soft lavender highlights",
+        "css": """
+            [data-testid="stAppViewContainer"] {
+                background: #0e0718 !important;
+                color: #ede7f6 !important;
+            }
+            [data-testid="stAppViewContainer"] h1,
+            [data-testid="stAppViewContainer"] h2,
+            [data-testid="stAppViewContainer"] h3,
+            [data-testid="stAppViewContainer"] h4 { color: #ce93d8 !important; }
+            [data-testid="stAppViewContainer"] p,
+            [data-testid="stAppViewContainer"] li,
+            [data-testid="stAppViewContainer"] span { color: #d1c4e9 !important; }
+            [data-testid="stMetric"] { background: #1a0a2e !important; border-radius:8px; padding:8px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#1a0a2e !important; border-color:#7b1fa2 !important; }
+            .stTabs [data-baseweb="tab-list"] { background:#0e0718 !important; }
+            .stTabs [data-baseweb="tab"] { color:#ce93d8 !important; }
+            [data-testid="stSidebar"] { background:#08030f !important; }
+        """,
+    },
+}
+
+
+def _inject_theme_css(theme_name: str, custom_css: str = None) -> None:
+    """Inject the active theme CSS into the page. Called once per load."""
+    if theme_name == "custom" and custom_css:
+        css = custom_css
+    else:
+        css = _STOCK_THEMES.get(theme_name, _STOCK_THEMES["default"])["css"]
+    if css:
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+
+# ==============================================================================
 # DASHBOARD TAB
 # ==============================================================================
 with tab_dash:
     from thinktank.engine.db import (
-        dashboard_get_layout, dashboard_save_layout, dashboard_get_stats
+        dashboard_get_layout, dashboard_save_layout, dashboard_get_stats,
+        dashboard_get_theme, dashboard_save_theme,
     )
 
     _dash_user = st.session_state.get("auth_user")
@@ -530,15 +709,25 @@ with tab_dash:
         st.info("👈 Use the **Log in / Register** panel in the sidebar to get started.")
     else:
         # ── Logged-in dashboard ──────────────────────────────────────────────
-        _dash_stats = dashboard_get_stats(_dash_user)
+        _dash_stats  = dashboard_get_stats(_dash_user)
         _dash_layout = dashboard_get_layout(_dash_user)
+        _dash_theme  = dashboard_get_theme(_dash_user)
 
-        # Customize mode toggle
-        _cust_col, _name_col = st.columns([1, 4])
-        with _name_col:
+        # Apply saved theme on every load
+        _inject_theme_css(_dash_theme["theme"], _dash_theme.get("custom"))
+
+        # Header row: welcome + customize toggle + theme indicator
+        _hc1, _hc2, _hc3 = st.columns([3, 1, 1])
+        with _hc1:
+            _active_theme_label = _STOCK_THEMES.get(
+                _dash_theme["theme"], {"label": "🎨 Custom"}
+            )["label"] if _dash_theme["theme"] != "custom" else "🎨 Custom"
             st.markdown(f"### 🏠 Welcome back, **{_dash_user.split('@')[0].title()}**")
-        with _cust_col:
+            st.caption(f"Active theme: {_active_theme_label}")
+        with _hc2:
             _customize_mode = st.toggle("✏️ Customize", key="dash_customize_toggle", value=False)
+        with _hc3:
+            _theme_mode = st.toggle("🎨 Themes", key="dash_theme_toggle", value=False)
 
         st.divider()
 
@@ -552,10 +741,94 @@ with tab_dash:
             "quick_actions":{"label": "⚡ Quick Actions",         "desc": "One-click buttons to jump to any tool"},
         }
 
-        # ── Customize panel ──────────────────────────────────────────────────
+        # ── Theme panel ──────────────────────────────────────────────────────
+        if _theme_mode:
+            st.markdown("#### 🎨 Dashboard Theme")
+            st.caption("Choose a stock theme or upload your own custom CSS. Your choice is saved permanently.")
+
+            # ── Stock theme grid ─────────────────────────────────────────────
+            st.markdown("**Stock Themes**")
+            _theme_keys = list(_STOCK_THEMES.keys())
+            _tcols = st.columns(4)
+            for _ti, _tk in enumerate(_theme_keys):
+                _tm = _STOCK_THEMES[_tk]
+                with _tcols[_ti % 4]:
+                    _is_active = (_dash_theme["theme"] == _tk)
+                    _border = "3px solid #3b82d4" if _is_active else "1px solid #ddd"
+                    # Render a preview swatch
+                    _swatch_bg  = "#ffffff"
+                    _swatch_acc = "#1f2328"
+                    if _tk == "midnight":     _swatch_bg, _swatch_acc = "#0a0f1e", "#90caf9"
+                    elif _tk == "forest":     _swatch_bg, _swatch_acc = "#0d1f0f", "#a5d6a7"
+                    elif _tk == "sunset":     _swatch_bg, _swatch_acc = "#1a0a00", "#ffb74d"
+                    elif _tk == "arctic":     _swatch_bg, _swatch_acc = "#e8f4fd", "#01579b"
+                    elif _tk == "rose_gold":  _swatch_bg, _swatch_acc = "#1a0d10", "#f48fb1"
+                    elif _tk == "neon":       _swatch_bg, _swatch_acc = "#000000", "#39ff14"
+                    elif _tk == "purple_haze":_swatch_bg, _swatch_acc = "#0e0718", "#ce93d8"
+                    st.markdown(
+                        f"""<div style="border:{_border};border-radius:8px;padding:10px;
+                                        background:{_swatch_bg};margin-bottom:6px;cursor:pointer;">
+                                <div style="font-size:0.85rem;font-weight:700;color:{_swatch_acc};">{_tm['label']}</div>
+                                <div style="font-size:0.72rem;color:{_swatch_acc};opacity:0.7;">{_tm['desc']}</div>
+                                {'<div style="font-size:0.68rem;color:#3b82d4;margin-top:4px;">✓ Active</div>' if _is_active else ''}
+                            </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    if not _is_active:
+                        if st.button(f"Apply", key=f"theme_apply_{_tk}", use_container_width=True):
+                            dashboard_save_theme(_dash_user, _tk)
+                            st.rerun()
+
+            st.divider()
+
+            # ── Custom CSS upload ────────────────────────────────────────────
+            st.markdown("**Custom Theme — Upload or Paste Your Own CSS**")
+            st.caption(
+                "Write any valid CSS targeting Streamlit elements. "
+                "Targets to style: `[data-testid=\"stAppViewContainer\"]` · "
+                "`[data-testid=\"stSidebar\"]` · `[data-testid=\"stMetric\"]` · "
+                "`.stTabs [data-baseweb=\"tab-list\"]`"
+            )
+
+            # Upload a .css file
+            _css_upload = st.file_uploader(
+                "Upload a .css file", type=["css", "txt"],
+                key="theme_css_upload",
+                help="Upload a .css file — its contents will be injected directly into the page."
+            )
+            _css_paste = st.text_area(
+                "Or paste CSS directly",
+                value=_dash_theme.get("custom") or "",
+                height=160,
+                key="theme_css_paste",
+                placeholder="[data-testid=\"stAppViewContainer\"] { background: #1a1a2e !important; }"
+            )
+
+            _cust_c1, _cust_c2 = st.columns(2)
+            with _cust_c1:
+                if st.button("💾 Save Custom Theme", type="primary", key="theme_save_custom", use_container_width=True):
+                    _final_css = ""
+                    if _css_upload is not None:
+                        _final_css = _css_upload.read().decode("utf-8", errors="replace")
+                    elif _css_paste.strip():
+                        _final_css = _css_paste.strip()
+                    if _final_css:
+                        dashboard_save_theme(_dash_user, "custom", _final_css)
+                        st.success("✅ Custom theme saved! Reloading…")
+                        st.rerun()
+                    else:
+                        st.error("Paste some CSS or upload a file first.")
+            with _cust_c2:
+                if st.button("↩️ Reset to Default", key="theme_reset", use_container_width=True):
+                    dashboard_save_theme(_dash_user, "default", None)
+                    st.rerun()
+
+            st.divider()
+
+        # ── Customize panel (widget layout) ──────────────────────────────────
         if _customize_mode:
             st.markdown("#### ✏️ Customize Your Dashboard")
-            st.caption("Drag the widgets into your preferred order using the ↑ ↓ buttons, or hide ones you don't need.")
+            st.caption("Reorder or hide widgets using the ↑ ↓ and ✕ buttons.")
 
             _new_order = list(_dash_layout)
             for _wi, _wid in enumerate(_new_order):
@@ -581,7 +854,6 @@ with tab_dash:
                         dashboard_save_layout(_dash_user, _new_order)
                         st.rerun()
 
-            # Show hidden widgets so user can restore them
             _hidden = [w for w in _WIDGET_META if w not in _new_order]
             if _hidden:
                 st.markdown("**Hidden widgets — click to restore:**")
@@ -595,7 +867,8 @@ with tab_dash:
                             st.rerun()
 
             if st.button("↩️ Reset to Default Layout", key="dash_reset_layout"):
-                dashboard_save_layout(_dash_user, list(dashboard_get_layout.__globals__["_DEFAULT_LAYOUT"]))
+                from thinktank.engine.db import _DEFAULT_LAYOUT as _DL
+                dashboard_save_layout(_dash_user, list(_DL))
                 st.rerun()
 
             st.divider()

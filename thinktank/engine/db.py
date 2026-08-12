@@ -131,6 +131,8 @@ CREATE TABLE IF NOT EXISTS sale_promo_codes (
 CREATE TABLE IF NOT EXISTS dashboard_prefs (
     email      TEXT PRIMARY KEY,
     layout     TEXT NOT NULL DEFAULT '[]',
+    theme      TEXT NOT NULL DEFAULT 'default',
+    theme_custom TEXT,
     updated_at TEXT NOT NULL
 );
 """
@@ -966,7 +968,8 @@ def dashboard_get_layout(email: str) -> list:
     with sqlite3.connect(DB_PATH) as con:
         con.execute(
             "CREATE TABLE IF NOT EXISTS dashboard_prefs "
-            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)"
+            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', "
+            "theme TEXT NOT NULL DEFAULT 'default', theme_custom TEXT, updated_at TEXT NOT NULL)"
         )
         row = con.execute(
             "SELECT layout FROM dashboard_prefs WHERE email=?", (email,)
@@ -990,12 +993,46 @@ def dashboard_save_layout(email: str, layout: list) -> None:
     with sqlite3.connect(DB_PATH) as con:
         con.execute(
             "CREATE TABLE IF NOT EXISTS dashboard_prefs "
-            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)"
+            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', "
+            "theme TEXT NOT NULL DEFAULT 'default', theme_custom TEXT, updated_at TEXT NOT NULL)"
         )
         con.execute(
             "INSERT INTO dashboard_prefs(email, layout, updated_at) VALUES(?,?,?) "
             "ON CONFLICT(email) DO UPDATE SET layout=excluded.layout, updated_at=excluded.updated_at",
             (email, json.dumps(layout), _utc()),
+        )
+
+
+def dashboard_get_theme(email: str) -> dict:
+    """Return theme name + custom CSS blob for a user. Defaults to 'default'."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS dashboard_prefs "
+            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', "
+            "theme TEXT NOT NULL DEFAULT 'default', theme_custom TEXT, updated_at TEXT NOT NULL)"
+        )
+        row = con.execute(
+            "SELECT theme, theme_custom FROM dashboard_prefs WHERE email=?", (email,)
+        ).fetchone()
+    if not row:
+        return {"theme": "default", "custom": None}
+    return {"theme": row[0] or "default", "custom": row[1]}
+
+
+def dashboard_save_theme(email: str, theme: str, custom_css: str = None) -> None:
+    """Persist the user's chosen theme name and optional custom CSS."""
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS dashboard_prefs "
+            "(email TEXT PRIMARY KEY, layout TEXT NOT NULL DEFAULT '[]', "
+            "theme TEXT NOT NULL DEFAULT 'default', theme_custom TEXT, updated_at TEXT NOT NULL)"
+        )
+        con.execute(
+            "INSERT INTO dashboard_prefs(email, layout, theme, theme_custom, updated_at) "
+            "VALUES(?, '[]', ?, ?, ?) "
+            "ON CONFLICT(email) DO UPDATE SET theme=excluded.theme, "
+            "theme_custom=excluded.theme_custom, updated_at=excluded.updated_at",
+            (email, theme, custom_css, _utc()),
         )
 
 
