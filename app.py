@@ -505,6 +505,52 @@ elif _g_qp.get("purchase") == "cancelled":
     st.query_params["sid"] = _g_sid
     if "purchase" in st.query_params: del st.query_params["purchase"]
 
+# ── Stripe helpers — module level so dashboard + buy tab can both use them ───
+import urllib.request as _ureq
+import urllib.parse as _uparse
+import json as _json
+
+def _sec(k):
+    import os
+    env_val = os.environ.get(k, "")
+    if env_val:
+        return env_val
+    try:
+        return st.secrets.get(k, "") or ""
+    except Exception:
+        return ""
+
+def _stripe_checkout(price_id, coins, session_id, api_key):
+    import base64, urllib.error as _uerr
+    api_key   = api_key.encode("ascii",   errors="ignore").decode("ascii").strip()
+    price_id  = price_id.encode("ascii",  errors="ignore").decode("ascii").strip()
+    base = "https://www.thinktankapp.net"
+    body = _uparse.urlencode({
+        "mode": "payment",
+        "line_items[0][price]": price_id,
+        "line_items[0][quantity]": "1",
+        "success_url": f"{base}?sid={session_id}&purchase=success&coins={coins}&session={session_id}",
+        "cancel_url":  f"{base}?sid={session_id}&purchase=cancelled",
+        "metadata[session_id]": session_id,
+        "metadata[coins]": str(coins),
+    })
+    token = base64.b64encode(f"{api_key}:".encode("ascii")).decode("ascii")
+    req = _ureq.Request(
+        "https://api.stripe.com/v1/checkout/sessions",
+        data=body.encode("ascii"),
+        headers={
+            "Authorization": f"Basic {token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    try:
+        with _ureq.urlopen(req, timeout=30) as resp:
+            return _json.loads(resp.read().decode("utf-8"))
+    except _uerr.HTTPError as http_err:
+        err_body = http_err.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Stripe {http_err.code}: {err_body}") from None
+
 # ── Helper: coin gate used by Ideas, Analysis, Gate tabs ─────────────────────
 def _require_coins(amount: int, action: str):
     """Deduct coins. Shows error and returns False if insufficient."""
@@ -988,15 +1034,86 @@ with tab_dash:
                         st.metric("🧠 AI Coins", stats["ai_balance"])
                         st.caption("Used for: Ask · Ideas · Analysis · Gate · Room")
                         if st.button("＋ Buy AI Coins", key="dash_buy_ai", use_container_width=True):
-                            st.session_state["main_tabs"] = "💳 Buy Coins"
-                            st.rerun()
+                            st.session_state["_dash_buy_panel"] = "ai"
                 with _cw2:
                     with st.container(border=True):
                         st.metric("🎨 Studio Coins", stats["studio_balance"])
                         st.caption("Used for: Content Studio · Power Tools · Hashtags")
                         if st.button("＋ Buy Studio Coins", key="dash_buy_studio", use_container_width=True):
-                            st.session_state["main_tabs"] = "💳 Buy Coins"
-                            st.rerun()
+                            st.session_state["_dash_buy_panel"] = "studio"
+
+                # ── Inline buy panel ─────────────────────────────────────────
+                _buy_panel = st.session_state.get("_dash_buy_panel")
+                if _buy_panel:
+                    st.divider()
+                    _dash_stripe_key = _sec("STRIPE_SECRET_KEY").encode("ascii", errors="ignore").decode("ascii").strip()
+                    _dash_sid = _auth_sid()
+                    if _buy_panel == "ai":
+                        st.markdown("##### 🧠 Top Up AI Coins")
+                        _ai_packs = [
+                            {"label": "Starter",  "coins": 25,  "price": "$4.99",  "price_id": _sec("STRIPE_PRICE_STARTER")},
+                            {"label": "Standard", "coins": 60,  "price": "$9.99",  "price_id": _sec("STRIPE_PRICE_STANDARD")},
+                            {"label": "Pro",      "coins": 150, "price": "$19.99", "price_id": _sec("STRIPE_PRICE_PRO")},
+                        ]
+                        _bp1, _bp2, _bp3 = st.columns(3)
+                        for _bpcol, _bpk in zip([_bp1, _bp2, _bp3], _ai_packs):
+                            with _bpcol:
+                                with st.container(border=True):
+                                    st.markdown(f"**{_bpk['label']}**")
+                                    st.markdown(f"🪙 {_bpk['coins']} coins")
+                                    st.markdown(f"**{_bpk['price']}**")
+                                    if st.button(f"Buy {_bpk['label']}", key=f"dash_ai_buy_{_bpk['label']}", use_container_width=True, type="primary"):
+                                        if not st.session_state.auth_user:
+                                            st.error("🔑 Log in first to purchase coins.")
+                                        elif not _dash_stripe_key or not _bpk["price_id"]:
+                                            st.error("Stripe not configured.")
+                                        else:
+                                            try:
+                                                _co = _stripe_checkout(_bpk["price_id"], _bpk["coins"], _dash_sid, _dash_stripe_key)
+                                                st.session_state["checkout_url"] = _co["url"]
+                                                st.session_state["_dash_buy_panel"] = None
+                                                st.rerun()
+                                            except Exception as _dbe:
+                                                st.error(f"Payment error: {_dbe}")
+                    else:
+                        st.markdown("##### 🎨 Top Up Studio Coins")
+                        _studio_packs = [
+                            {"label": "Studio Starter", "coins": 20,  "price": "$15",  "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER")},
+                            {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
+                            {"label": "Studio Max",     "coins": 700, "price": "$700", "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
+                        ]
+                        _bsp1, _bsp2, _bsp3 = st.columns(3)
+                        for _bspcol, _bspk in zip([_bsp1, _bsp2, _bsp3], _studio_packs):
+                            with _bspcol:
+                                with st.container(border=True):
+                                    st.markdown(f"**{_bspk['label']}**")
+                                    st.markdown(f"🪙 {_bspk['coins']} coins")
+                                    st.markdown(f"**{_bspk['price']}**")
+                                    if st.button(f"Buy", key=f"dash_studio_buy_{_bspk['label'].replace(' ','_')}", use_container_width=True, type="primary"):
+                                        if not st.session_state.auth_user:
+                                            st.error("🔑 Log in first to purchase coins.")
+                                        elif not _dash_stripe_key or not _bspk["price_id"]:
+                                            st.error("Stripe not configured.")
+                                        else:
+                                            try:
+                                                _co = _stripe_checkout(_bspk["price_id"], _bspk["coins"], _dash_sid, _dash_stripe_key)
+                                                st.session_state["checkout_url"] = _co["url"]
+                                                st.session_state["_dash_buy_panel"] = None
+                                                st.rerun()
+                                            except Exception as _dbe:
+                                                st.error(f"Payment error: {_dbe}")
+                    if st.button("✕ Close", key="dash_buy_close"):
+                        st.session_state["_dash_buy_panel"] = None
+                        st.rerun()
+
+                # Show Stripe link if checkout was just created from dashboard
+                if st.session_state.get("checkout_url") and not st.session_state.get("_dash_buy_panel"):
+                    st.success("✅ Checkout ready!")
+                    st.link_button("👉 Complete Payment on Stripe", st.session_state.checkout_url, type="primary", use_container_width=True)
+                    st.caption("After payment, return here — your coins load automatically.")
+                    if st.button("✖ Cancel", key="dash_cancel_checkout"):
+                        st.session_state.checkout_url = None
+                        st.rerun()
 
                 # ── Referral widget ──────────────────────────────────────────
                 from thinktank.engine.db import referral_stats
@@ -2270,23 +2387,8 @@ A single reusable prompt they paste into any AI tool to generate on-brand conten
 with tab_coins:
     try:
         import uuid as _uuid
-        import urllib.request as _ureq
-        import urllib.parse as _uparse
-        import json as _json
 
-        def _sec(k):
-            import os
-            # Railway env vars always win — prevents secrets.toml from overriding live keys
-            env_val = os.environ.get(k, "")
-            if env_val:
-                return env_val
-            try:
-                return st.secrets.get(k, "") or ""
-            except Exception:
-                return ""
-
-        # ── Session + balance (must come before any use of _bal) ─────────────
-        # If logged in, use email as the persistent wallet ID
+        # ── Session + balance ─────────────────────────────────────────────────
         if "coin_session_id" not in st.session_state:
             import uuid as _uuid2
             st.session_state.coin_session_id = str(_uuid2.uuid4())
@@ -2302,41 +2404,7 @@ with tab_coins:
 
         _stripe_key = _sec("STRIPE_SECRET_KEY").encode("ascii", errors="ignore").decode("ascii").strip()
 
-        def _stripe_checkout(price_id, coins, session_id, api_key):
-            """Call Stripe Checkout API directly — no SDK, no encoding issues."""
-            import base64, urllib.error as _uerr
-            # Strip any non-ASCII / whitespace characters that may have crept in
-            api_key   = api_key.encode("ascii",   errors="ignore").decode("ascii").strip()
-            price_id  = price_id.encode("ascii",  errors="ignore").decode("ascii").strip()
-            base = "https://www.thinktankapp.net"
-            body = _uparse.urlencode({
-                "mode": "payment",
-                "line_items[0][price]": price_id,
-                "line_items[0][quantity]": "1",
-                "success_url": f"{base}?sid={session_id}&purchase=success&coins={coins}&session={session_id}",
-                "cancel_url":  f"{base}?sid={session_id}&purchase=cancelled",
-                "metadata[session_id]": session_id,
-                "metadata[coins]": str(coins),
-            })
-            token = base64.b64encode(f"{api_key}:".encode("ascii")).decode("ascii")
-            req = _ureq.Request(
-                "https://api.stripe.com/v1/checkout/sessions",
-                data=body.encode("ascii"),
-                headers={
-                    "Authorization": f"Basic {token}",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                method="POST",
-            )
-            try:
-                with _ureq.urlopen(req, timeout=30) as resp:
-                    return _json.loads(resp.read().decode("utf-8"))
-            except _uerr.HTTPError as http_err:
-                err_body = http_err.read().decode("utf-8", errors="replace")
-                raise RuntimeError(f"Stripe {http_err.code}: {err_body}") from None
-
         # ── Session ID ────────────────────────────────────────────────────────
-        # _sid and _bal already set above — just alias for clarity
         _sid    = _sid_early
         _coindb = _earlydb
 
