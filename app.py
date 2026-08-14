@@ -1527,7 +1527,6 @@ with tab_ask:
     ask_text = st.text_area("Ask something", height=120, key="ask_input",
                             placeholder="Ask ThinkTank anything…")
     st.caption("🧠 Uses **AI coins** (1 per message) — Studio coins are separate, used only in Content Studio.")
-    st.caption("🧠 Uses **AI coins** (1 per message). Studio coins are separate — used only in Content Studio.")
     a1, a2, a3 = st.columns(3)
 
     with a1:
@@ -1859,90 +1858,96 @@ with tab_studio:
     if not _all_content:
         st.caption("No content yet. Use the generator above to create your first post.")
     else:
-        # ── SECTION 1: Scheduled Posts ────────────────────────────────────────
-        if _sched_posts:
-            with st.expander(f"📅 Scheduled Posts ({len(_sched_posts)})", expanded=False):
-                _by_day = {}
-                for _c in _sched_posts:
-                    try:
-                        _wd = _dt.fromisoformat(_c["scheduled_for"]).strftime("%A")
-                    except Exception:
-                        _wd = "Other"
-                    _by_day.setdefault(_wd, []).append(_c)
+        from datetime import datetime as _dldt2
 
-                for _day in _DAYS + ["Other"]:
-                    if _day not in _by_day:
-                        continue
-                    _day_items = _by_day[_day]
-                    st.markdown(f"**📌 {_day}** — {len(_day_items)} post{'s' if len(_day_items)>1 else ''}")
-                    for _c in _day_items:
-                        _ico = _PLAT_ICONS.get(_c["platform"], "📱")
-                        _prev = _c["content"][:100].replace("\n", " ") + ("…" if len(_c["content"]) > 100 else "")
+        # Build a dict: platform → {scheduled: [...], posts: [...]}
+        _by_plat_all = {}
+        for _c in _all_content:
+            _p = _c["platform"]
+            if _p not in _by_plat_all:
+                _by_plat_all[_p] = {"scheduled": [], "posts": []}
+            if _c.get("scheduled_for"):
+                _by_plat_all[_p]["scheduled"].append(_c)
+            else:
+                _by_plat_all[_p]["posts"].append(_c)
+
+        # One expander per platform — sorted alphabetically
+        for _plat in sorted(_by_plat_all.keys()):
+            _pdata     = _by_plat_all[_plat]
+            _ico       = _PLAT_ICONS.get(_plat, "📱")
+            _p_sched   = _pdata["scheduled"]
+            _p_posts   = _pdata["posts"]
+            _p_total   = len(_p_sched) + len(_p_posts)
+            _p_label   = f"{_ico} {_plat}  —  {_p_total} post{'s' if _p_total != 1 else ''}"
+            if _p_sched:
+                _p_label += f"  ·  {len(_p_sched)} scheduled"
+
+            with st.expander(_p_label, expanded=False):
+
+                # ── Scheduled ─────────────────────────────────────────────
+                if _p_sched:
+                    st.markdown("**📅 Scheduled**")
+                    # group by day
+                    _day_map = {}
+                    for _c in _p_sched:
+                        try:
+                            _wd = _dt.fromisoformat(_c["scheduled_for"]).strftime("%A")
+                        except Exception:
+                            _wd = "Other"
+                        _day_map.setdefault(_wd, []).append(_c)
+                    for _day in _DAYS + ["Other"]:
+                        if _day not in _day_map:
+                            continue
+                        st.caption(f"📌 {_day}")
+                        for _c in _day_map[_day]:
+                            _prev = _c["content"][:120].replace("\n", " ") + ("…" if len(_c["content"]) > 120 else "")
+                            ca, cb = st.columns([6, 1])
+                            with ca:
+                                st.markdown(f"<span style='font-size:0.83rem'>{_prev}</span>", unsafe_allow_html=True)
+                            with cb:
+                                if not _c["released"]:
+                                    st.caption("🔒")
+                                else:
+                                    if st.button("Edit", key=f"s_open_{_c['id']}", use_container_width=True):
+                                        _open_editor(_c["id"], _day, _plat)
+
+                # ── Repository ────────────────────────────────────────────
+                if _p_posts:
+                    if _p_sched:
+                        st.divider()
+                    st.markdown("**📬 Posts Repository**")
+                    for _c in sorted(_p_posts, key=lambda x: x["created_at"], reverse=True):
+                        _prev = _c["content"][:120].replace("\n", " ") + ("…" if len(_c["content"]) > 120 else "")
                         ca, cb = st.columns([6, 1])
                         with ca:
-                            st.markdown(f"{_ico} **{_c['platform']}** · <span style='color:#888;font-size:0.82rem'>{_prev}</span>", unsafe_allow_html=True)
-                        with cb:
-                            if not _c["released"]:
-                                st.caption("🔒")
-                            else:
-                                if st.button("Edit", key=f"s_open_{_c['id']}", use_container_width=True):
-                                    _open_editor(_c["id"], _day, _c["platform"])
-                    st.divider()
-
-        # ── SECTION 2: My Posts Repository ───────────────────────────────────
-        if _repo_posts:
-            with st.expander(f"📬 My Posts Repository ({len(_repo_posts)})", expanded=False):
-                _by_plat = {}
-                for _c in _repo_posts:
-                    _by_plat.setdefault(_c["platform"], []).append(_c)
-                for _plat in sorted(_by_plat.keys()):
-                    _plat_items = _by_plat[_plat]
-                    _ico = _PLAT_ICONS.get(_plat, "📱")
-                    st.markdown(f"**{_ico} {_plat}** — {len(_plat_items)} post{'s' if len(_plat_items)>1 else ''}")
-                    for _c in sorted(_plat_items, key=lambda x: x["created_at"], reverse=True):
-                        _prev = _c["content"][:100].replace("\n", " ") + ("…" if len(_c["content"]) > 100 else "")
-                        ca, cb = st.columns([6, 1])
-                        with ca:
-                            st.markdown(f"<span style='color:#888;font-size:0.78rem'>{_c['tone']} · {_c['created_at'][:10]}</span><br>{_prev}", unsafe_allow_html=True)
+                            st.markdown(
+                                f"<span style='color:#888;font-size:0.75rem'>{_c['tone']} · {_c['created_at'][:10]}</span>"
+                                f"<br><span style='font-size:0.83rem'>{_prev}</span>",
+                                unsafe_allow_html=True,
+                            )
                         with cb:
                             if st.button("Edit", key=f"r_open_{_c['id']}", use_container_width=True):
                                 _open_editor(_c["id"], _plat, _plat)
-                    st.divider()
 
-        # ── FOLDER 3: Download (per-section) ─────────────────────────────────
-        with st.expander(f"📥  Download Your Work  ({_total_posts} posts)", expanded=False):
-            from datetime import datetime as _dldt2
-            st.caption("Download by section — no more walls of text.")
-
-            if _sched_posts:
-                _sl = [f"THINKTANK — SCHEDULED POSTS", f"Account: {st.session_state.auth_user or 'Guest'}",
-                       f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
-                for _c in _sched_posts:
-                    _sl += [f"\n[{_c['platform'].upper()}] Scheduled: {_c.get('scheduled_for','')} | {_c['tone']}",
-                            "-"*40, _c["content"], ""]
-                st.download_button("📥 Scheduled Posts (.txt)", data="\n".join(_sl).encode("utf-8"),
-                    file_name=f"tt_scheduled_{_dldt2.now().strftime('%Y%m%d')}.txt", mime="text/plain", use_container_width=True)
-
-            if _repo_posts:
-                _rl = [f"THINKTANK — MY POSTS REPOSITORY", f"Account: {st.session_state.auth_user or 'Guest'}",
-                       f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
-                for _c in _repo_posts:
-                    _rl += [f"\n[{_c['platform'].upper()}] {_c['tone']} | Created: {_c['created_at'][:10]}",
-                            "-"*40, _c["content"], ""]
-                st.download_button("📥 My Posts Repository (.txt)", data="\n".join(_rl).encode("utf-8"),
-                    file_name=f"tt_repository_{_dldt2.now().strftime('%Y%m%d')}.txt", mime="text/plain", use_container_width=True)
-
-            _al = [f"THINKTANK — FULL CONTENT PACKAGE", f"Account: {st.session_state.auth_user or 'Guest'}",
-                   f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}", "="*50]
-            for _c in _all_content:
-                _al += [f"\n[{_c['platform'].upper()}] {_c['tone']} | {_c['created_at'][:10]}" +
-                        (f" | Scheduled: {_c['scheduled_for']}" if _c.get("scheduled_for") else ""),
-                        "-"*40, _c["content"], ""]
-            _al += ["\n"+"="*50, "Made with ThinkTank  www.thinktankapp.net", "="*50]
-            st.markdown("---")
-            st.download_button("📥 Download Everything (.txt)", data="\n".join(_al).encode("utf-8"),
-                file_name=f"thinktank_full_{_dldt2.now().strftime('%Y%m%d_%H%M')}.txt",
-                mime="text/plain", type="primary", use_container_width=True)
+                # ── Per-platform download ──────────────────────────────────
+                st.divider()
+                _dl_lines = [
+                    f"THINKTANK — {_plat.upper()} CONTENT",
+                    f"Account: {st.session_state.auth_user or 'Guest'}",
+                    f"Downloaded: {_dldt2.now().strftime('%B %d, %Y %I:%M %p')}",
+                    "=" * 50,
+                ]
+                for _c in sorted(_p_sched + _p_posts, key=lambda x: x["created_at"], reverse=True):
+                    _tag = f"Scheduled: {_c['scheduled_for']}" if _c.get("scheduled_for") else f"Created: {_c['created_at'][:10]}"
+                    _dl_lines += [f"\n[{_c['tone'].upper()}] {_tag}", "-" * 40, _c["content"], ""]
+                st.download_button(
+                    f"📥 Download {_plat} posts (.txt)",
+                    data="\n".join(_dl_lines).encode("utf-8"),
+                    file_name=f"thinktank_{_plat.replace('/','_').replace(' ','_').lower()}_{_dldt2.now().strftime('%Y%m%d')}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                    key=f"dl_{_plat}",
+                )
 
         # ── Inline editor (auto-scroll via JS anchor) ─────────────────────────
         _open = st.session_state.get("sched_open")
