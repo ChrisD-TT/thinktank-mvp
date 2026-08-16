@@ -1147,7 +1147,7 @@ with tab_dash:
                         _studio_packs = [
                             {"label": "Studio Starter", "coins": 20,  "price": "$15",  "desc": "Posts · Hashtags · TikTok scripts · 15% multi-platform discount",        "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER")},
                             {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "desc": "All Starter features + 3 coins per edit · best for regular creators",      "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
-                            {"label": "Studio Max",     "coins": 700, "price": "$700", "desc": "Unlimited Studio · Free edits for life · 35% promo code · best value",   "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
+                            {"label": "Studio Max",     "coins": 700, "price": "$700", "desc": "700 Studio coins · free edits on every post · includes 35% off promo code", "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
                         ]
                         _bsp1, _bsp2, _bsp3 = st.columns(3)
                         for _bspcol, _bspk in zip([_bsp1, _bsp2, _bsp3], _studio_packs):
@@ -2527,7 +2527,7 @@ with tab_coins:
             {"id": "studio_pro",      "label": "Studio Pro",        "coins": 85,  "price": "$65",    "tier": "studio_pro",    "price_id": _sec("STRIPE_PRICE_STUDIO_PRO"),      "desc": "📱 All Starter features + 3-coin edits"},
             {"id": "studio_week1",    "label": "Studio Week 1",     "coins": 110, "price": "$200",   "tier": "studio_week1",  "price_id": _sec("STRIPE_PRICE_STUDIO_WEEK1"),    "desc": "📱 Up to 3 platforms · Full week · Daily email 12:01 AM · 3-coin edits"},
             {"id": "studio_2week",    "label": "Studio 2-Week",     "coins": 250, "price": "$425",   "tier": "studio_2week",  "price_id": _sec("STRIPE_PRICE_STUDIO_2WEEK"),    "desc": "📱 All 5 platforms · 2 weeks · FREE edits · Daily email · 35% promo code"},
-            {"id": "studio_max",      "label": "Studio Max",        "coins": 700, "price": "$700",   "tier": "studio_max",    "price_id": _sec("STRIPE_PRICE_STUDIO_MAX"),      "desc": "📱 Unlimited Studio · Permanent FREE edits · 700 coins · 35% promo code"},
+            {"id": "studio_max",      "label": "Studio Max",        "coins": 700, "price": "$700",   "tier": "studio_max",    "price_id": _sec("STRIPE_PRICE_STUDIO_MAX"),      "desc": "📱 700 Studio coins · free edits on every post · includes 35% off promo code"},
         ]
 
         # hold checkout URL in session_state so it survives Streamlit reruns
