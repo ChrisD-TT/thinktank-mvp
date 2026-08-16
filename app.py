@@ -623,7 +623,7 @@ def _require_coins(amount: int, action: str):
     sid, db = _get_coin_session()
     if not db.coin_spend(sid, amount):
         bal = db.coin_balance(sid)
-        st.error(f"🪙 Not enough coins — **{action}** costs {amount} coin{'s' if amount > 1 else ''}. You have {bal}. Go to 💳 Buy Coins to top up.")
+        st.error(f"🪙 Not enough coins — **{action}** costs {amount} coin{'s' if amount > 1 else ''} and you have {bal}. Head to the **💳 Buy Coins** tab to top up.")
         return False
     return True
 
@@ -1535,19 +1535,11 @@ with tab_ask:
     _ask_ai_bal     = _askdb.coin_balance(_ask_sid)
     _ask_studio_bal = _askdb.studio_coin_balance(_ask_sid)
 
-    _bal_col, _aicoin_col, _stcoin_col = st.columns([3, 1, 1])
+    _bal_col, _aicoin_col = st.columns([4, 1])
     with _bal_col:
         st.subheader("Ask / Chat")
     with _aicoin_col:
-        if _ask_ai_bal > 0:
-            st.success(f"🧠 AI: {_ask_ai_bal}")
-        else:
-            st.warning("🧠 AI: 0 — 💳 Buy Coins")
-    with _stcoin_col:
-        if _ask_studio_bal > 0:
-            st.success(f"🎨 Studio: {_ask_studio_bal}")
-        else:
-            st.info(f"🎨 Studio: 0")
+        st.metric("🧠 AI Coins", _ask_ai_bal)
 
     chats   = chat_list(limit=50)
     chat_id = st.session_state.current_chat_id
@@ -1625,7 +1617,7 @@ with tab_ask:
                 # Check + deduct coin before calling AI
                 _has_coin = _askdb.coin_spend(_ask_sid, 1)
                 if not _has_coin:
-                    st.error("🪙 No coins remaining. Go to the **💳 Buy Coins** tab to top up.")
+                    st.error("🪙 No AI coins remaining — head to the **💳 Buy Coins** tab to top up.")
                 else:
                     with st.spinner("Thinking…"):
                         try:
@@ -1755,7 +1747,7 @@ with tab_studio:
         elif not _sel_platforms:
             st.error("Please select at least one platform.")
         elif _studio_bal < _cost:
-            st.error(f"🪙 Not enough coins. This costs {_cost} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
+            st.error(f"🪙 Not enough Studio coins — this costs {_cost} coins and you have {_studio_bal}. Head to the **💳 Buy Coins** tab to top up.")
         else:
             # deduct coins
             _sdb.studio_coin_spend(_studio_sid, _cost)
@@ -1874,7 +1866,7 @@ with tab_studio:
                 if not _ht_topic.strip():
                     st.error("Enter a topic first.")
                 elif _studio_bal < 3:
-                    st.error("🎨 Need 3 Studio coins. Go to 💳 Buy Coins to top up.")
+                    st.error("🪙 Not enough Studio coins — hashtags cost 3 coins and you have none. Head to the **💳 Buy Coins** tab to top up.")
                 else:
                     with st.spinner("Finding the best hashtags..."):
                         import thinktank.engine.ai as _ht_ai
@@ -2225,7 +2217,7 @@ with tab_studio:
                     st.caption(f"Adds **{_ext_mins} min** · **{_ext_cost} coins** · you have **{_studio_bal} coins**")
                     if st.button(f"⏳ Add {_ext_mins} min ({_ext_cost} coins)", key="extend_session", type="primary"):
                         if _studio_bal < _ext_cost:
-                            st.error(f"💰 Need {_ext_cost} coins — you have {_studio_bal}. Go to 💳 Buy Coins.")
+                            st.error(f"🪙 Not enough Studio coins — this costs {_ext_cost} coins and you have {_studio_bal}. Head to the **💳 Buy Coins** tab to top up.")
                         else:
                             _sdb.studio_coin_spend(_studio_sid, _ext_cost)
                             st.session_state.tool_session_end  += _ext_mins * 60
@@ -2476,7 +2468,7 @@ A single reusable prompt they paste into any AI tool to generate on-brand conten
                         st.caption(f"{_per_min} coins/min · {'Best value' if _sm >= 45 else 'Quick session'}")
                         if st.button(f"Unlock {_sm} min", key=f"start_session_{_sm}", type="primary", use_container_width=True):
                             if _studio_bal < _sc_final:
-                                st.error(f"💰 Need {_sc_final} coins — you have {_studio_bal}. Go to 💳 Buy Coins to top up.")
+                                st.error(f"🪙 Not enough Studio coins — this costs {_sc_final} coins and you have {_studio_bal}. Head to the **💳 Buy Coins** tab to top up.")
                             else:
                                 _sdb.studio_coin_spend(_studio_sid, _sc_final)
                                 tool_session_record(_studio_sid, _sm, _sc_final)
@@ -2525,8 +2517,8 @@ with tab_coins:
             # ── Content Studio Plans ──────────────────────────────────────────
             {"id": "studio_starter",  "label": "Studio Starter",   "coins": 20,  "price": "$15",    "tier": "studio_starter","price_id": _sec("STRIPE_PRICE_STUDIO_STARTER"),  "desc": "📱 Posts · Hashtags · TikTok scripts · 15% multi-platform"},
             {"id": "studio_pro",      "label": "Studio Pro",        "coins": 85,  "price": "$65",    "tier": "studio_pro",    "price_id": _sec("STRIPE_PRICE_STUDIO_PRO"),      "desc": "📱 All Starter features + 3-coin edits"},
-            {"id": "studio_week1",    "label": "Studio Week 1",     "coins": 110, "price": "$200",   "tier": "studio_week1",  "price_id": _sec("STRIPE_PRICE_STUDIO_WEEK1"),    "desc": "📱 Up to 3 platforms · Full week · Daily email 12:01 AM · 3-coin edits"},
-            {"id": "studio_2week",    "label": "Studio 2-Week",     "coins": 250, "price": "$425",   "tier": "studio_2week",  "price_id": _sec("STRIPE_PRICE_STUDIO_2WEEK"),    "desc": "📱 All 5 platforms · 2 weeks · FREE edits · Daily email · 35% promo code"},
+            {"id": "studio_week1",    "label": "Studio Week 1",     "coins": 110, "price": "$200",   "tier": "studio_week1",  "price_id": _sec("STRIPE_PRICE_STUDIO_WEEK1"),    "desc": "📱 Up to 3 platforms · 110 coins · full week of content · 3-coin edits"},
+            {"id": "studio_2week",    "label": "Studio 2-Week",     "coins": 250, "price": "$425",   "tier": "studio_2week",  "price_id": _sec("STRIPE_PRICE_STUDIO_2WEEK"),    "desc": "📱 All 5 platforms · 250 coins · 2 weeks · FREE edits · 35% promo code"},
             {"id": "studio_max",      "label": "Studio Max",        "coins": 700, "price": "$700",   "tier": "studio_max",    "price_id": _sec("STRIPE_PRICE_STUDIO_MAX"),      "desc": "📱 700 Studio coins · free edits on every post · includes 35% off promo code"},
         ]
 
@@ -2773,9 +2765,7 @@ with tab_coins:
                 st.info(f"🎟 Your promo code: **`{_up['promo_code']}`** (35% off next purchase — unused)")
 
     except Exception as _coins_err:
-        st.error(f"Buy Coins error: {_coins_err}")
-        import traceback
-        st.code(traceback.format_exc())
+        st.error("Something went wrong loading the store — please refresh the page. If the issue persists, contact support.")
 
     # ── Donate nudge at bottom of Buy Coins ───────────────────────────────────
     st.divider()
@@ -2845,14 +2835,14 @@ with tab_admin:
     
         openai_key = _get_secret("OPENAI_API_KEY")
         if openai_key:
-            st.info("🟢 **Active provider: OpenAI (gpt-4o-mini)** — Ollama is available as fallback")
+            st.info("🟢 **AI provider connected** — all features active")
         else:
-            st.info("🟡 **Active provider: Ollama** — Add OPENAI_API_KEY to secrets/env to use OpenAI")
-    
+            st.info("🟡 **Fallback AI active** — add OPENAI_API_KEY to Railway to enable primary provider")
+
         col_ai1, col_ai2 = st.columns(2)
-    
+
         with col_ai1:
-            st.markdown("**OpenAI (gpt-4o-mini)**")
+            st.markdown("**Primary AI Provider**")
             if st.button("Check OpenAI Connection", type="primary"):
                 if not openai_key:
                     st.warning("⚠️ No OPENAI_API_KEY found")
