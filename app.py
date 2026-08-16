@@ -99,7 +99,76 @@ st.markdown(
     /* Hide Streamlit's "Made with Streamlit" footer */
     footer { display: none !important; }
     [data-testid="stFooter"] { display: none !important; }
+
+    /* ── Floating scroll-to-top button ───────────────────────────── */
+    #tt-scroll-top-btn {
+        position: fixed;
+        bottom: 28px;
+        right: 28px;
+        z-index: 9999;
+        background: #1e3a5f;
+        color: #7eb8f7;
+        border: 1px solid #2a5080;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    #tt-scroll-top-btn.visible { opacity: 1; }
+    #tt-scroll-top-btn:hover { background: #2a5080; }
     </style>
+
+    <div id="tt-scroll-top-btn" title="Back to Dashboard">↑</div>
+
+    <script>
+    (function() {
+        // Streamlit renders inside an iframe — we target the main scrollable area
+        function getScroller() {
+            return window.parent.document.querySelector('[data-testid="stAppViewBlockContainer"]')
+                || window.parent.document.querySelector('.main')
+                || window.parent.document.documentElement;
+        }
+        var btn = window.parent.document.getElementById('tt-scroll-top-btn');
+        if (!btn) {
+            // inject into parent if not found (first load)
+            btn = window.parent.document.createElement('div');
+            btn.id = 'tt-scroll-top-btn';
+            btn.title = 'Back to Dashboard';
+            btn.innerHTML = '↑';
+            btn.style.cssText = 'position:fixed;bottom:28px;right:28px;z-index:9999;'
+                + 'background:#1e3a5f;color:#7eb8f7;border:1px solid #2a5080;'
+                + 'border-radius:50%;width:44px;height:44px;font-size:20px;font-weight:bold;'
+                + 'cursor:pointer;display:flex;align-items:center;justify-content:center;'
+                + 'opacity:0;transition:opacity 0.4s ease;box-shadow:0 2px 12px rgba(0,0,0,0.4);'
+                + 'line-height:1;';
+            window.parent.document.body.appendChild(btn);
+        }
+        var scroller = getScroller();
+        function onScroll() {
+            var scrollTop = scroller.scrollTop || window.parent.pageYOffset || 0;
+            if (scrollTop > 300) {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else {
+                btn.style.opacity = '0';
+                btn.style.pointerEvents = 'none';
+            }
+        }
+        scroller.addEventListener('scroll', onScroll, { passive: true });
+        window.parent.addEventListener('scroll', onScroll, { passive: true });
+        btn.onclick = function() {
+            scroller.scrollTo({ top: 0, behavior: 'smooth' });
+            window.parent.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+    })();
+    </script>
     """,
     unsafe_allow_html=True,
 )
@@ -1602,43 +1671,42 @@ with tab_studio:
     # studio_2week gets free edits only while their 250 coins last.
     _free_edits = (_user_plan["plan_tier"] in FREE_EDIT_TIERS) and (_studio_bal > 0)
 
-    st.subheader("📱 Content Studio")
-    st.caption("AI-generated social media content. Coins are charged per generation.")
-
-    # ── Coin balance indicator ────────────────────────────────────────────────
-    _scol1, _scol2 = st.columns([3,1])
-    with _scol2:
-        st.metric("🪙 Coins", _studio_bal)
+    # ── Header row: title + coin balance ─────────────────────────────────────
+    _sh1, _sh2 = st.columns([4, 1])
+    with _sh1:
+        st.subheader("📱 Content Studio")
+        st.caption("AI-generated posts, scripts & hashtags. Coins charged per generation.")
+    with _sh2:
+        st.metric("🎨 Studio Coins", _studio_bal)
 
     st.divider()
 
-    # ── Generator ─────────────────────────────────────────────────────────────
-    st.markdown("### ✍️ Generate Content")
+    # ── Generator form ────────────────────────────────────────────────────────
+    _fc1, _fc2 = st.columns([1, 1])
+    with _fc1:
+        _gen_type = st.selectbox("Content Type", [
+            "🎯 Single Post  —  7 coins",
+            "🪝 Post + Hashtags + Hook  —  12 coins per platform",
+            "🎬 TikTok / Reel Script  —  18 coins",
+        ], key="studio_gen_type")
+    with _fc2:
+        _tone = st.selectbox("Tone", _TONES, key="studio_tone")
 
-    _gen_type = st.selectbox("Content Type", [
-        "🎯 Single Post  —  7 coins",
-        "🪝 Post + Hashtags + Hook  —  12 coins per platform",
-        "🎬 TikTok / Reel Script  —  18 coins",
-    ], key="studio_gen_type")
-
-    # platform selector
     if "TikTok" in _gen_type:
         _sel_platforms = ["TikTok"]
+        st.caption("Platform: TikTok (fixed for scripts)")
     else:
         _sel_platforms = st.multiselect(
             "Platform(s)", _PLATFORMS, default=["Twitter/X"], key="studio_platforms"
         )
-        # multi-platform 15% discount
         if len(_sel_platforms) > 1:
             _base = _STUDIO_COSTS["post_hook"] if "Hashtags" in _gen_type else _STUDIO_COSTS["single"]
             _full_price = _base * len(_sel_platforms)
             _disc_price = max(1, round(_full_price * _MULTI_DISC))
             _saved = _full_price - _disc_price
-            st.success(f"🎁 Multi-platform discount! {len(_sel_platforms)} platforms × {_base} coins = ~~{_full_price}~~ **{_disc_price} coins** (15% off — you save {_saved} coins)")
+            st.success(f"🎁 {len(_sel_platforms)} platforms · ~~{_full_price}~~ **{_disc_price} coins** (15% multi-platform discount — saves {_saved})")
 
-    _topic = st.text_area("Topic / Brief", placeholder="e.g. Launching ThinkTank — AI decision engine for entrepreneurs", key="studio_topic", height=80)
-    _tone  = st.selectbox("Tone", _TONES, key="studio_tone")
-
+    _topic = st.text_area("Topic / Brief", placeholder="e.g. Launching ThinkTank — AI decision engine for entrepreneurs", key="studio_topic", height=72)
 
     # calculate coin cost
     def _studio_cost(gen_type, platforms):
@@ -1651,10 +1719,14 @@ with tab_studio:
         if len(platforms) > 1: base = max(1, round(base * _MULTI_DISC))
         return base
 
-    _cost = _studio_cost(_gen_type, _sel_platforms)
-    st.markdown(f"**Cost: {_cost} coins**")
+    _cost = _studio_cost(_gen_type, _sel_platforms if _sel_platforms else ["TikTok"])
+    _gb1, _gb2 = st.columns([3, 1])
+    with _gb2:
+        st.markdown(f"**Cost: {_cost} coins**")
+    with _gb1:
+        _gen_btn = st.button("🚀 Generate", key="studio_generate", type="primary", use_container_width=True)
 
-    if st.button("🚀 Generate Content", key="studio_generate", type="primary", use_container_width=True):
+    if _gen_btn:
         if not st.session_state.auth_user:
             st.error("🔑 Please log in first — use the sidebar to log in or register.")
         elif not _topic.strip():
@@ -1731,20 +1803,30 @@ with tab_studio:
     # ── Show just-generated content ───────────────────────────────────────────
     if st.session_state.get("studio_generated"):
         st.divider()
-        st.success(f"✅ Content generated! {st.session_state.get('studio_cost_paid',0)} coins used.")
+        _n = len(st.session_state["studio_generated"])
+        _coins_used = st.session_state.get('studio_cost_paid', 0)
+        st.success(f"✅ {_n} post{'s' if _n > 1 else ''} generated · {_coins_used} coins used · saved to your library")
         for _item in st.session_state["studio_generated"]:
-            _lbl = f"📱 {_item['platform']}" + (f" — {_item['day']}" if _item.get('day') else "")
+            _ico = {"Twitter/X":"🐦","LinkedIn":"💼","TikTok":"🎵","Instagram":"📸",
+                    "Reddit":"👽","Facebook":"📘","YouTube":"▶️","Threads":"🧵"}.get(_item['platform'],"📱")
             if _item.get("released", True):
-                with st.expander(_lbl, expanded=True):
-                    st.markdown(_item["content"])
-                    st.caption(f"ID #{_item['id']} · saved to your schedule")
+                st.markdown(f"**{_ico} {_item['platform']}**")
+                st.markdown(_item["content"])
+                st.caption(f"Saved to library · ID #{_item['id']}")
             else:
-                st.info(f"🔒 {_lbl} — scheduled, unlocks on its release date")
+                st.info(f"🔒 {_ico} {_item['platform']} — unlocks on its release date")
+            if len(st.session_state["studio_generated"]) > 1:
+                st.divider()
+        if st.button("✕ Clear results", key="studio_clear_gen"):
+            st.session_state.pop("studio_generated", None)
+            st.rerun()
 
+
+    st.divider()
 
     # ── Hashtag Generator ────────────────────────────────────────────────────
     st.markdown("### 🏷️ Hashtag Generator")
-    st.caption("Get a targeted set of hashtags for any topic and platform. **3 Studio coins per set.**")
+    st.caption("Targeted hashtag sets for any platform · **3 Studio coins**")
 
     with st.expander("Generate Hashtags", expanded=False):
         if not st.session_state.auth_user:
