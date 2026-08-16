@@ -144,6 +144,16 @@ CREATE TABLE IF NOT EXISTS referrals (
     rewarded       INTEGER NOT NULL DEFAULT 0,
     created_at     TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS email_queue (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    to_email    TEXT NOT NULL,
+    subject     TEXT NOT NULL,
+    html_body   TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    created_at  TEXT NOT NULL,
+    sent_at     TEXT
+);
 """
 
 
@@ -1210,3 +1220,40 @@ def referral_leaderboard(limit: int = 20) -> list:
             (limit,),
         ).fetchall()
     return [{"email": r[0], "referrals": r[1], "coins_earned": r[1] * 10} for r in rows]
+
+
+# ── Email queue ──────────────────────────────────────────────────────────────
+
+def email_queue_add(to_email: str, subject: str, html_body: str) -> int:
+    """Queue an email for sending. Returns the new row id."""
+    with sqlite3.connect(DB_PATH) as con:
+        cur = con.execute(
+            "INSERT INTO email_queue(to_email, subject, html_body, status, created_at) "
+            "VALUES (?, ?, ?, 'pending', ?)",
+            (to_email, subject, html_body, _utc()),
+        )
+        return int(cur.lastrowid)
+
+
+def email_queue_flush() -> int:
+    """Send all pending emails in the queue. Returns count sent."""
+    try:
+        from thinktank.engine.email import send_email
+    except ImportError:
+        return 0
+    with sqlite3.connect(DB_PATH) as con:
+        rows = con.execute(
+            "SELECT id, to_email, subject, html_body FROM email_queue WHERE status='pending' ORDER BY id LIMIT 50"
+        ).fetchall()
+    sent = 0
+    for row_id, to, subj, html in rows:
+        result = send_email(to, subj, html)
+        new_status = "sent" if result.get("ok") else "failed"
+        with sqlite3.connect(DB_PATH) as con:
+            con.execute(
+                "UPDATE email_queue SET status=?, sent_at=? WHERE id=?",
+                (new_status, _utc(), row_id),
+            )
+        if result.get("ok"):
+            sent += 1
+    return sent

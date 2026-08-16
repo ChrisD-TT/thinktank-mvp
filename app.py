@@ -459,7 +459,15 @@ with st.sidebar:
                             user_merge_session(_res["email"], _anon)
                         _gdb_mod.sid_save_auth(_GLOBAL_SID, _res["email"])
                         st.session_state.auth_user = _res["email"]
-                        if _pending_ref:
+                        # Send welcome email (fire-and-forget)
+                        try:
+                            from thinktank.engine.email import email_welcome
+                            from thinktank.engine.db import coin_balance
+                            _welcome_coins = coin_balance(_res["email"])
+                            email_welcome(_res["email"], _welcome_coins)
+                        except Exception:
+                            pass
+                        # Send welcome email (fire-and-forget)
                             st.success("Account created! Welcome 🎉 +5 bonus coins added from your referral link!")
                             st.session_state.pop("pending_ref_code", None)
                         else:
@@ -639,151 +647,151 @@ def _refund_coins(amount: int, reason: str = ""):
 # Stock themes — each defines CSS variables injected onto [data-testid="stAppViewContainer"]
 _STOCK_THEMES = {
     "default": {
-        "label": "☀️ Default",
-        "desc":  "Clean ThinkTank standard",
-        "preview": "linear-gradient(135deg,#ffffff 0%,#f0f4ff 100%)",
-        "preview_text": "#1f2328",
-        "css": "",   # no override — uses Streamlit default
+        "label": "Default",
+        "desc":  "Clean white — ThinkTank standard",
+        "preview": "linear-gradient(135deg,#f8faff 0%,#eef2ff 50%,#e8f0fe 100%)",
+        "preview_text": "#1a237e",
+        "css": "",
     },
     "midnight": {
-        "label": "🌌 Deep Space",
-        "desc":  "Starfield navy — electric blue accents",
-        "preview": "linear-gradient(135deg,#020818 0%,#0a1628 50%,#0d2040 100%)",
-        "preview_text": "#7eb8f7",
+        "label": "Deep Space",
+        "desc":  "Immersive starfield — deep navy with electric blue glow",
+        "preview": "linear-gradient(160deg,#000510 0%,#020d24 35%,#061640 60%,#0a1e52 85%,#05102a 100%)",
+        "preview_text": "#60a5fa",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#020818 0%,#0a1628 55%,#0d2040 100%) !important;
+                background: linear-gradient(160deg,#000510 0%,#020d24 35%,#061640 60%,#0a1e52 85%,#05102a 100%) !important;
                 color: #dce9ff !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #7eb8f7 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #60a5fa !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #b8d0ee !important; }
-            [data-testid="stMarkdownContainer"] p { color: #b8d0ee !important; }
-            [data-testid="stMetric"] { background: rgba(14,30,58,0.85) !important; border:1px solid #1e3a6e !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(10,22,44,0.7) !important; border-color:#1e3a6e !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(6,14,30,0.9) !important; }
-            .stTabs [data-baseweb="tab"] { color:#7eb8f7 !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#020d1e,#04152e) !important; }
-            [data-testid="stSidebar"] * { color:#b8d0ee !important; }
+            [data-testid="stAppViewContainer"] span { color: #bdd4f8 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #bdd4f8 !important; }
+            [data-testid="stMetric"] { background: rgba(6,22,64,0.85) !important; border:1px solid #1e40af !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(2,13,36,0.75) !important; border-color:#1e3a8a !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(0,5,16,0.95) !important; }
+            .stTabs [data-baseweb="tab"] { color:#60a5fa !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#000510,#020d24) !important; }
+            [data-testid="stSidebar"] * { color:#bdd4f8 !important; }
         """,
     },
     "aurora": {
-        "label": "🌌 Aurora",
-        "desc":  "Northern lights — teal fades to violet",
-        "preview": "linear-gradient(135deg,#011a12 0%,#042a2b 40%,#0d1b38 70%,#1a0d2e 100%)",
-        "preview_text": "#4dffc3",
+        "label": "Aurora",
+        "desc":  "Northern lights dancing — teal to violet across a dark sky",
+        "preview": "linear-gradient(160deg,#010f0a 0%,#012a20 25%,#033040 50%,#0d1545 70%,#1a0835 100%)",
+        "preview_text": "#34eba8",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#011810 0%,#03231e 30%,#0a1830 65%,#160b28 100%) !important;
-                color: #d4fef4 !important;
+                background: linear-gradient(160deg,#010f0a 0%,#012a20 25%,#033040 50%,#0d1545 70%,#1a0835 100%) !important;
+                color: #d0fdf0 !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #4dffc3 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #34eba8 !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #a8f0de !important; }
-            [data-testid="stMarkdownContainer"] p { color: #a8f0de !important; }
-            [data-testid="stMetric"] { background: rgba(5,40,30,0.8) !important; border:1px solid #0d6e54 !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(3,28,22,0.7) !important; border-color:#0d6e54 !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(1,20,15,0.9) !important; }
-            .stTabs [data-baseweb="tab"] { color:#4dffc3 !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#010e09,#031a16) !important; }
-            [data-testid="stSidebar"] * { color:#a8f0de !important; }
+            [data-testid="stAppViewContainer"] span { color: #9ef5d4 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #9ef5d4 !important; }
+            [data-testid="stMetric"] { background: rgba(1,35,26,0.85) !important; border:1px solid #059669 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(1,22,16,0.75) !important; border-color:#047857 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(1,10,8,0.95) !important; }
+            .stTabs [data-baseweb="tab"] { color:#34eba8 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#010f0a,#012018) !important; }
+            [data-testid="stSidebar"] * { color:#9ef5d4 !important; }
         """,
     },
     "sunset": {
-        "label": "🌅 Golden Hour",
-        "desc":  "Dusk amber melting into deep crimson",
-        "preview": "linear-gradient(135deg,#1a0800 0%,#2d0f00 40%,#3d1500 100%)",
-        "preview_text": "#ffb347",
+        "label": "Golden Hour",
+        "desc":  "Warm dusk sky — amber and gold burning into deep crimson",
+        "preview": "linear-gradient(160deg,#0d0400 0%,#2a0a00 30%,#4a1200 55%,#6b1f00 75%,#3a0800 100%)",
+        "preview_text": "#fbbf24",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#100500 0%,#250c00 40%,#3a1000 75%,#1a0000 100%) !important;
-                color: #ffe8c8 !important;
+                background: linear-gradient(160deg,#0d0400 0%,#2a0a00 30%,#4a1200 55%,#6b1f00 75%,#3a0800 100%) !important;
+                color: #fef3c7 !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #ffb347 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #fbbf24 !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #f5cfa0 !important; }
-            [data-testid="stMarkdownContainer"] p { color: #f5cfa0 !important; }
-            [data-testid="stMetric"] { background: rgba(45,16,0,0.85) !important; border:1px solid #7a2800 !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(32,8,0,0.7) !important; border-color:#7a2800 !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(16,4,0,0.9) !important; }
-            .stTabs [data-baseweb="tab"] { color:#ffb347 !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#0a0200,#180600) !important; }
-            [data-testid="stSidebar"] * { color:#f5cfa0 !important; }
+            [data-testid="stAppViewContainer"] span { color: #fcd98a !important; }
+            [data-testid="stMarkdownContainer"] p { color: #fcd98a !important; }
+            [data-testid="stMetric"] { background: rgba(74,18,0,0.85) !important; border:1px solid #b45309 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(42,10,0,0.75) !important; border-color:#92400e !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(13,4,0,0.95) !important; }
+            .stTabs [data-baseweb="tab"] { color:#fbbf24 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#0d0400,#1e0700) !important; }
+            [data-testid="stSidebar"] * { color:#fcd98a !important; }
         """,
     },
     "neon": {
-        "label": "⚡ Cyberpunk",
-        "desc":  "Pitch black — neon grid with cyan & magenta",
-        "preview": "linear-gradient(135deg,#000000 0%,#050010 50%,#000000 100%)",
-        "preview_text": "#00fff0",
+        "label": "Cyberpunk",
+        "desc":  "Pitch black city grid lit by cyan neon and magenta pulse",
+        "preview": "linear-gradient(160deg,#000000 0%,#03000f 40%,#060018 70%,#000000 100%)",
+        "preview_text": "#00f5ff",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#000000 0%,#04000e 50%,#000000 100%) !important;
-                color: #e0e0ff !important;
+                background: linear-gradient(160deg,#000000 0%,#03000f 40%,#060018 70%,#000000 100%) !important;
+                color: #e2e8ff !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #00fff0 !important; text-shadow: 0 0 8px #00fff088; }
+            [data-testid="stAppViewContainer"] h4 { color: #00f5ff !important; text-shadow: 0 0 12px #00f5ff99, 0 0 24px #00f5ff44; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #c0c0e8 !important; }
-            [data-testid="stMarkdownContainer"] p { color: #c0c0e8 !important; }
-            [data-testid="stMetric"] { background: #050010 !important; border:1px solid #00fff055 !important; border-radius:8px; padding:10px; box-shadow: 0 0 10px #00fff022; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:#04000e !important; border-color:#ff00ff55 !important; border-radius:10px !important; box-shadow: 0 0 8px #ff00ff22; }
-            .stTabs [data-baseweb="tab-list"] { background:#000 !important; }
-            .stTabs [data-baseweb="tab"] { color:#00fff0 !important; }
-            [data-testid="stSidebar"] { background:#000000 !important; border-right: 1px solid #00fff033 !important; }
-            [data-testid="stSidebar"] * { color:#c0c0e8 !important; }
+            [data-testid="stAppViewContainer"] span { color: #b0bcf0 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #b0bcf0 !important; }
+            [data-testid="stMetric"] { background: #040014 !important; border:1px solid #00f5ff44 !important; border-radius:8px; padding:10px; box-shadow: 0 0 14px #00f5ff18; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:#03000e !important; border-color:#ff00ff44 !important; border-radius:10px !important; box-shadow: 0 0 10px #ff00ff14; }
+            .stTabs [data-baseweb="tab-list"] { background:#000000 !important; border-bottom:1px solid #00f5ff22 !important; }
+            .stTabs [data-baseweb="tab"] { color:#00f5ff !important; }
+            [data-testid="stSidebar"] { background:#000000 !important; border-right:1px solid #00f5ff22 !important; }
+            [data-testid="stSidebar"] * { color:#b0bcf0 !important; }
         """,
     },
     "rose_gold": {
-        "label": "✨ Rose Gold",
-        "desc":  "Luxe dark rose melting into champagne gold",
-        "preview": "linear-gradient(135deg,#1a0510 0%,#2a0c18 40%,#1f0f05 100%)",
-        "preview_text": "#f9a8b8",
+        "label": "Rose Gold",
+        "desc":  "Luxurious dark rose bleeding into warm champagne gold",
+        "preview": "linear-gradient(160deg,#160208 0%,#2d0815 35%,#3a0f0a 60%,#2a1200 85%,#150605 100%)",
+        "preview_text": "#fda4af",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#130308 0%,#220812 40%,#1c0b03 75%,#0e0408 100%) !important;
-                color: #fde8ef !important;
+                background: linear-gradient(160deg,#160208 0%,#2d0815 35%,#3a0f0a 60%,#2a1200 85%,#150605 100%) !important;
+                color: #fce7f3 !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #f9a8b8 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #fda4af !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #f0c8d0 !important; }
-            [data-testid="stMarkdownContainer"] p { color: #f0c8d0 !important; }
-            [data-testid="stMetric"] { background: rgba(38,8,20,0.85) !important; border:1px solid #8b1a3a !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(28,5,14,0.7) !important; border-color:#8b1a3a !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(15,2,8,0.9) !important; }
-            .stTabs [data-baseweb="tab"] { color:#f9a8b8 !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#0e0306,#1a0610) !important; }
-            [data-testid="stSidebar"] * { color:#f0c8d0 !important; }
+            [data-testid="stAppViewContainer"] span { color: #fbcfe8 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #fbcfe8 !important; }
+            [data-testid="stMetric"] { background: rgba(45,8,21,0.88) !important; border:1px solid #9d174d !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(30,4,12,0.75) !important; border-color:#881337 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(16,2,8,0.95) !important; }
+            .stTabs [data-baseweb="tab"] { color:#fda4af !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#160208,#250610) !important; }
+            [data-testid="stSidebar"] * { color:#fbcfe8 !important; }
         """,
     },
     "purple_haze": {
-        "label": "🔮 Galaxy",
-        "desc":  "Deep cosmos — rich violet to indigo",
-        "preview": "linear-gradient(135deg,#080318 0%,#12053a 50%,#06001a 100%)",
+        "label": "Galaxy",
+        "desc":  "Deep cosmos at midnight — violet to indigo nebula",
+        "preview": "linear-gradient(160deg,#04010e 0%,#0e0330 35%,#1a0650 60%,#0d0235 85%,#040112 100%)",
         "preview_text": "#c084fc",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#050112 0%,#0e0430 45%,#160860 70%,#080118 100%) !important;
-                color: #ece8ff !important;
+                background: linear-gradient(160deg,#04010e 0%,#0e0330 35%,#1a0650 60%,#0d0235 85%,#040112 100%) !important;
+                color: #ede9fe !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
@@ -791,25 +799,25 @@ _STOCK_THEMES = {
             [data-testid="stAppViewContainer"] h4 { color: #c084fc !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #d4c4f8 !important; }
-            [data-testid="stMarkdownContainer"] p { color: #d4c4f8 !important; }
-            [data-testid="stMetric"] { background: rgba(20,6,50,0.85) !important; border:1px solid #5b21b6 !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(12,3,35,0.75) !important; border-color:#5b21b6 !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(5,1,18,0.95) !important; }
+            [data-testid="stAppViewContainer"] span { color: #ddd6fe !important; }
+            [data-testid="stMarkdownContainer"] p { color: #ddd6fe !important; }
+            [data-testid="stMetric"] { background: rgba(26,6,80,0.88) !important; border:1px solid #6d28d9 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(14,3,48,0.78) !important; border-color:#5b21b6 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(4,1,14,0.97) !important; }
             .stTabs [data-baseweb="tab"] { color:#c084fc !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#040010,#0a0220) !important; }
-            [data-testid="stSidebar"] * { color:#d4c4f8 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#04010e,#0e0330) !important; }
+            [data-testid="stSidebar"] * { color:#ddd6fe !important; }
         """,
     },
     "ocean": {
-        "label": "🌊 Ocean Deep",
-        "desc":  "Midnight teal depths — bioluminescent glow",
-        "preview": "linear-gradient(135deg,#001a20 0%,#002d38 40%,#001520 100%)",
+        "label": "Ocean Deep",
+        "desc":  "Abyssal ocean floor — bioluminescent teal against midnight water",
+        "preview": "linear-gradient(160deg,#000c14 0%,#001c2e 30%,#003048 55%,#004060 75%,#001828 100%)",
         "preview_text": "#22d3ee",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#000d12 0%,#001820 40%,#002535 70%,#000e15 100%) !important;
-                color: #d0f4ff !important;
+                background: linear-gradient(160deg,#000c14 0%,#001c2e 30%,#003048 55%,#004060 75%,#001828 100%) !important;
+                color: #cffafe !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
@@ -817,51 +825,51 @@ _STOCK_THEMES = {
             [data-testid="stAppViewContainer"] h4 { color: #22d3ee !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #a0e8f8 !important; }
-            [data-testid="stMarkdownContainer"] p { color: #a0e8f8 !important; }
-            [data-testid="stMetric"] { background: rgba(0,28,38,0.85) !important; border:1px solid #0e7490 !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(0,20,28,0.75) !important; border-color:#0e7490 !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(0,10,16,0.95) !important; }
+            [data-testid="stAppViewContainer"] span { color: #a5f3fc !important; }
+            [data-testid="stMarkdownContainer"] p { color: #a5f3fc !important; }
+            [data-testid="stMetric"] { background: rgba(0,30,48,0.88) !important; border:1px solid #0e7490 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(0,18,30,0.78) !important; border-color:#0e6680 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(0,10,18,0.97) !important; }
             .stTabs [data-baseweb="tab"] { color:#22d3ee !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#00080e,#001018) !important; }
-            [data-testid="stSidebar"] * { color:#a0e8f8 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#000c14,#001820) !important; }
+            [data-testid="stSidebar"] * { color:#a5f3fc !important; }
         """,
     },
     "ember": {
-        "label": "🔥 Ember",
-        "desc":  "Smoldering dark coal — deep red embers",
-        "preview": "linear-gradient(135deg,#0e0000 0%,#1e0500 40%,#2a0800 100%)",
-        "preview_text": "#ff6b35",
+        "label": "Ember",
+        "desc":  "Smoldering volcanic dark — deep lava-red coals glowing beneath",
+        "preview": "linear-gradient(160deg,#080000 0%,#1c0200 30%,#340600 55%,#4a0e00 75%,#200300 100%)",
+        "preview_text": "#fb923c",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#090000 0%,#180300 40%,#260600 70%,#0c0000 100%) !important;
-                color: #ffd0b8 !important;
+                background: linear-gradient(160deg,#080000 0%,#1c0200 30%,#340600 55%,#4a0e00 75%,#200300 100%) !important;
+                color: #fff1e6 !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
             [data-testid="stAppViewContainer"] h3,
-            [data-testid="stAppViewContainer"] h4 { color: #ff6b35 !important; }
+            [data-testid="stAppViewContainer"] h4 { color: #fb923c !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #f0a080 !important; }
-            [data-testid="stMarkdownContainer"] p { color: #f0a080 !important; }
-            [data-testid="stMetric"] { background: rgba(30,5,0,0.85) !important; border:1px solid #7c1d00 !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(22,3,0,0.75) !important; border-color:#7c1d00 !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(8,0,0,0.95) !important; }
-            .stTabs [data-baseweb="tab"] { color:#ff6b35 !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#060000,#100200) !important; }
-            [data-testid="stSidebar"] * { color:#f0a080 !important; }
+            [data-testid="stAppViewContainer"] span { color: #fed7aa !important; }
+            [data-testid="stMarkdownContainer"] p { color: #fed7aa !important; }
+            [data-testid="stMetric"] { background: rgba(52,6,0,0.88) !important; border:1px solid #9a3412 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(28,2,0,0.78) !important; border-color:#7c2d12 !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(8,0,0,0.97) !important; }
+            .stTabs [data-baseweb="tab"] { color:#fb923c !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#080000,#180200) !important; }
+            [data-testid="stSidebar"] * { color:#fed7aa !important; }
         """,
     },
     "arctic": {
-        "label": "🏔️ Arctic",
-        "desc":  "Crisp glacier white — clean cobalt accents",
-        "preview": "linear-gradient(135deg,#f0f8ff 0%,#e0f0ff 50%,#d8ecff 100%)",
+        "label": "Arctic",
+        "desc":  "Glacier-white and ice-blue — crisp, clean, open sky",
+        "preview": "linear-gradient(160deg,#f0f9ff 0%,#e0f2fe 35%,#bae6fd 65%,#e8f4ff 100%)",
         "preview_text": "#0369a1",
         "css": """
             [data-testid="stAppViewContainer"] {
-                background: linear-gradient(160deg,#f8fcff 0%,#edf5ff 50%,#e0eeff 100%) !important;
-                color: #0c2340 !important;
+                background: linear-gradient(160deg,#f0f9ff 0%,#e0f2fe 35%,#bae6fd 65%,#e8f4ff 100%) !important;
+                color: #082f49 !important;
             }
             [data-testid="stAppViewContainer"] h1,
             [data-testid="stAppViewContainer"] h2,
@@ -869,14 +877,14 @@ _STOCK_THEMES = {
             [data-testid="stAppViewContainer"] h4 { color: #0369a1 !important; }
             [data-testid="stAppViewContainer"] p,
             [data-testid="stAppViewContainer"] li,
-            [data-testid="stAppViewContainer"] span { color: #1e4068 !important; }
-            [data-testid="stMarkdownContainer"] p { color: #1e4068 !important; }
-            [data-testid="stMetric"] { background: rgba(224,238,255,0.9) !important; border:1px solid #7dd3fc !important; border-radius:10px; padding:10px; }
-            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(232,246,255,0.8) !important; border-color:#7dd3fc !important; border-radius:10px !important; }
-            .stTabs [data-baseweb="tab-list"] { background:rgba(200,230,255,0.9) !important; }
+            [data-testid="stAppViewContainer"] span { color: #075985 !important; }
+            [data-testid="stMarkdownContainer"] p { color: #075985 !important; }
+            [data-testid="stMetric"] { background: rgba(186,230,253,0.7) !important; border:1px solid #38bdf8 !important; border-radius:10px; padding:10px; }
+            [data-testid="stVerticalBlockBorderWrapper"] { background:rgba(224,242,254,0.75) !important; border-color:#7dd3fc !important; border-radius:10px !important; }
+            .stTabs [data-baseweb="tab-list"] { background:rgba(186,230,253,0.6) !important; }
             .stTabs [data-baseweb="tab"] { color:#0369a1 !important; }
-            [data-testid="stSidebar"] { background:linear-gradient(180deg,#e8f4ff,#d8eeff) !important; }
-            [data-testid="stSidebar"] * { color:#1e4068 !important; }
+            [data-testid="stSidebar"] { background:linear-gradient(180deg,#e0f2fe,#bae6fd) !important; }
+            [data-testid="stSidebar"] * { color:#075985 !important; }
         """,
     },
 }
@@ -2517,8 +2525,8 @@ with tab_coins:
             # ── Content Studio Plans ──────────────────────────────────────────
             {"id": "studio_starter",  "label": "Studio Starter",   "coins": 20,  "price": "$15",    "tier": "studio_starter","price_id": _sec("STRIPE_PRICE_STUDIO_STARTER"),  "desc": "📱 Posts · Hashtags · TikTok scripts · 15% multi-platform"},
             {"id": "studio_pro",      "label": "Studio Pro",        "coins": 85,  "price": "$65",    "tier": "studio_pro",    "price_id": _sec("STRIPE_PRICE_STUDIO_PRO"),      "desc": "📱 All Starter features + 3-coin edits"},
-            {"id": "studio_week1",    "label": "Studio Week 1",     "coins": 110, "price": "$200",   "tier": "studio_week1",  "price_id": _sec("STRIPE_PRICE_STUDIO_WEEK1"),    "desc": "📱 Up to 3 platforms · 110 coins · full week of content · 3-coin edits"},
-            {"id": "studio_2week",    "label": "Studio 2-Week",     "coins": 250, "price": "$425",   "tier": "studio_2week",  "price_id": _sec("STRIPE_PRICE_STUDIO_2WEEK"),    "desc": "📱 All 5 platforms · 250 coins · 2 weeks · FREE edits · 35% promo code"},
+            {"id": "studio_week1",    "label": "Studio Week 1",     "coins": 110, "price": "$200",   "tier": "studio_week1",  "price_id": _sec("STRIPE_PRICE_STUDIO_WEEK1"),    "desc": "Up to 3 platforms | 110 coins | full week of content | 3-coin edits | daily content emails"},
+            {"id": "studio_2week",    "label": "Studio 2-Week",     "coins": 250, "price": "$425",   "tier": "studio_2week",  "price_id": _sec("STRIPE_PRICE_STUDIO_2WEEK"),    "desc": "All 5 platforms | 250 coins | 2 weeks | FREE edits | daily content emails | 35% promo code"},
             {"id": "studio_max",      "label": "Studio Max",        "coins": 700, "price": "$700",   "tier": "studio_max",    "price_id": _sec("STRIPE_PRICE_STUDIO_MAX"),      "desc": "📱 700 Studio coins · free edits on every post · includes 35% off promo code"},
         ]
 
@@ -2548,6 +2556,7 @@ with tab_coins:
                     st.session_state.checkout_error = None
                     # upgrade plan tier on click (confirmed on return)
                     st.session_state["pending_tier"] = pkg.get("tier")
+                    st.session_state["pending_pkg_label"] = pkg.get("label", "Coin Pack")
                     st.session_state["pending_is_studio"] = pkg.get("tier") is not None and "studio" in (pkg.get("tier") or "")
                 except Exception as _e:
                     st.session_state.checkout_url   = None
@@ -2686,6 +2695,21 @@ with tab_coins:
             _promo_earned = None
             if _pending_tier and st.session_state.auth_user:
                 _promo_earned = user_set_plan(st.session_state.auth_user, _pending_tier)
+            # Send purchase confirmation / studio welcome email
+            try:
+                if st.session_state.auth_user:
+                    from thinktank.engine.email import email_purchase_confirmation, email_studio_week_welcome
+                    _email_to = st.session_state.auth_user
+                    _pkg_label = (st.session_state.pop("pending_pkg_label", None) or "Coin Pack")
+                    _email_coins = int(st.query_params.get("coins", "0"))
+                    _studio_tiers = {"studio_week1", "studio_2week"}
+                    if _pending_tier and _pending_tier in _studio_tiers:
+                        _tier_labels = {"studio_week1": "Studio Week 1", "studio_2week": "Studio 2-Week"}
+                        email_studio_week_welcome(_email_to, _tier_labels.get(_pending_tier, _pkg_label), _email_coins)
+                    else:
+                        email_purchase_confirmation(_email_to, _pkg_label, _email_coins)
+            except Exception:
+                pass
             _bal_now = _coindb.coin_get_or_create(_sid)
             st.success(f"✅ Payment confirmed! **{_bal_now} coins** are ready to use.")
             if _promo_earned:
