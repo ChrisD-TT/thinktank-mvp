@@ -1146,7 +1146,7 @@ with tab_dash:
                         st.markdown("##### 🎨 Top Up Studio Coins")
                         _studio_packs = [
                             {"label": "Studio Starter", "coins": 20,  "price": "$15",  "desc": "Posts · Hashtags · TikTok scripts · 15% multi-platform discount",        "price_id": _sec("STRIPE_PRICE_STUDIO_STARTER")},
-                            {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "desc": "All Starter features · 3-coin edits · free edits while coins last",       "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
+                            {"label": "Studio Pro",     "coins": 85,  "price": "$65",  "desc": "All Starter features + 3 coins per edit · best for regular creators",      "price_id": _sec("STRIPE_PRICE_STUDIO_PRO")},
                             {"label": "Studio Max",     "coins": 700, "price": "$700", "desc": "Unlimited Studio · Free edits for life · 35% promo code · best value",   "price_id": _sec("STRIPE_PRICE_STUDIO_MAX")},
                         ]
                         _bsp1, _bsp2, _bsp3 = st.columns(3)
@@ -1197,15 +1197,36 @@ with tab_dash:
 
                 # Mini coin history
                 if stats["recent_txns"]:
-                    st.caption("Recent AI coin activity:")
+                    st.caption("Recent activity:")
                     for _tx in stats["recent_txns"][:5]:
-                        _sign = "+" if _tx["amount"] > 0 else ""
-                        _clr  = "🟢" if _tx["amount"] > 0 else "🔴"
-                        _lbl  = {"welcome":"🎁 Welcome","purchase":"💳 Purchase",
-                                 "spend":"💨 Spent","merge":"🔀 Merge",
-                                 "refund":"↩ Refund","admin-grant":"✅ Grant",
-                                 "referral-reward":"🔗 Referral","referral-bonus":"🎁 Referral Bonus"}.get(_tx["type"], _tx["type"])
-                        st.caption(f"{_clr} {_lbl} · {_sign}{_tx['amount']} · {_tx['created_at'][:10]}")
+                        _amt  = _tx["amount"]
+                        _date = _tx["created_at"][:10]
+                        _type = _tx["type"]
+                        if _type == "welcome":
+                            _msg = f"🎁 Welcome gift — +{_amt} coins"
+                        elif _type == "purchase":
+                            _msg = f"💳 Purchased {_amt} coins"
+                        elif _type == "spend":
+                            _msg = f"💨 Used {abs(_amt)} coin{'s' if abs(_amt) != 1 else ''}"
+                        elif _type == "referral-reward":
+                            _msg = f"🔗 Referral reward — +{_amt} coins"
+                        elif _type == "referral-bonus":
+                            _msg = f"🎁 Joined via referral — +{_amt} coins"
+                        elif _type == "admin-grant":
+                            _msg = f"✅ Admin granted +{_amt} coins"
+                        elif _type == "refund":
+                            _msg = f"↩️ Refunded {abs(_amt)} coin{'s' if abs(_amt) != 1 else ''}"
+                        elif _type == "merge":
+                            _msg = f"🔀 Coins moved to your account (+{_amt})"
+                        else:
+                            _msg = f"{'➕' if _amt > 0 else '➖'} {abs(_amt)} coins"
+                        _clr = "#4ade80" if _amt > 0 else "#f87171"
+                        st.markdown(
+                            f"<div style='font-size:0.78rem;padding:3px 0;'>"
+                            f"<span style='color:{_clr};font-weight:600;'>{_msg}</span>"
+                            f"<span style='color:#666;margin-left:8px;'>{_date}</span></div>",
+                            unsafe_allow_html=True,
+                        )
 
             elif wid == "recent_posts":
                 st.markdown("#### 📝 Recent Posts")
