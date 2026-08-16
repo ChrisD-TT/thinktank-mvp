@@ -100,78 +100,75 @@ st.markdown(
     footer { display: none !important; }
     [data-testid="stFooter"] { display: none !important; }
 
-    /* ── Floating scroll-to-top button ───────────────────────────── */
-    #tt-scroll-top-btn {
-        position: fixed;
-        bottom: 28px;
-        right: 28px;
-        z-index: 9999;
-        background: #1e3a5f;
-        color: #7eb8f7;
-        border: 1px solid #2a5080;
-        border-radius: 50%;
-        width: 44px;
-        height: 44px;
-        font-size: 18px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        transition: opacity 0.4s ease;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-    }
-    #tt-scroll-top-btn.visible { opacity: 1; }
-    #tt-scroll-top-btn:hover { background: #2a5080; }
+    /* Back-to-top button — injected into parent document via CSS */
+    #tt-top-anchor { position: absolute; top: 0; left: 0; }
     </style>
 
-    <div id="tt-scroll-top-btn" title="Back to Dashboard">↑</div>
+    <div id="tt-top-anchor"></div>
 
     <script>
     (function() {
-        // Streamlit renders inside an iframe — we target the main scrollable area
+        var doc = window.parent.document;
+
+        // Remove any stale button from previous renders
+        var old = doc.getElementById('tt-back-top');
+        if (old) old.remove();
+
+        // Create button in the PARENT document
+        var btn = doc.createElement('button');
+        btn.id = 'tt-back-top';
+        btn.innerHTML = '&#8679;';
+        btn.title = 'Back to top';
+        btn.setAttribute('style',
+            'position:fixed;bottom:30px;right:30px;z-index:999999;' +
+            'width:46px;height:46px;border-radius:50%;' +
+            'background:#1e3a5f;color:#7eb8f7;border:2px solid #3b6ea8;' +
+            'font-size:22px;font-weight:bold;cursor:pointer;' +
+            'opacity:0;pointer-events:none;' +
+            'transition:opacity 0.3s ease;' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'box-shadow:0 4px 16px rgba(0,0,0,0.5);line-height:1;'
+        );
+        doc.body.appendChild(btn);
+
+        // Find the real scrollable container Streamlit uses
         function getScroller() {
-            return window.parent.document.querySelector('[data-testid="stAppViewBlockContainer"]')
-                || window.parent.document.querySelector('.main')
-                || window.parent.document.documentElement;
+            return doc.querySelector('[data-testid="stMainBlockContainer"]')
+                || doc.querySelector('[data-testid="stAppViewBlockContainer"]')
+                || doc.querySelector('section.main')
+                || doc.querySelector('.main > div')
+                || doc.documentElement;
         }
-        var btn = window.parent.document.getElementById('tt-scroll-top-btn');
-        if (!btn) {
-            // inject into parent if not found (first load)
-            btn = window.parent.document.createElement('div');
-            btn.id = 'tt-scroll-top-btn';
-            btn.title = 'Back to Dashboard';
-            btn.innerHTML = '↑';
-            btn.style.cssText = 'position:fixed;bottom:28px;right:28px;z-index:9999;'
-                + 'background:#1e3a5f;color:#7eb8f7;border:1px solid #2a5080;'
-                + 'border-radius:50%;width:44px;height:44px;font-size:20px;font-weight:bold;'
-                + 'cursor:pointer;display:flex;align-items:center;justify-content:center;'
-                + 'opacity:0;transition:opacity 0.4s ease;box-shadow:0 2px 12px rgba(0,0,0,0.4);'
-                + 'line-height:1;';
-            window.parent.document.body.appendChild(btn);
+
+        function show(v) {
+            btn.style.opacity = v ? '1' : '0';
+            btn.style.pointerEvents = v ? 'auto' : 'none';
         }
+
+        function checkScroll() {
+            var el = getScroller();
+            var y = (el === doc.documentElement) ? (window.parent.scrollY || doc.documentElement.scrollTop) : el.scrollTop;
+            show(y > 280);
+        }
+
+        function scrollTop() {
+            var el = getScroller();
+            try { el.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { el.scrollTop = 0; }
+            try { window.parent.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+        }
+
+        // Attach to every plausible scroll source
         var scroller = getScroller();
-        function onScroll() {
-            var scrollTop = scroller.scrollTop || window.parent.pageYOffset || 0;
-            if (scrollTop > 300) {
-                btn.style.opacity = '1';
-                btn.style.pointerEvents = 'auto';
-            } else {
-                btn.style.opacity = '0';
-                btn.style.pointerEvents = 'none';
-            }
-        }
-        scroller.addEventListener('scroll', onScroll, { passive: true });
-        window.parent.addEventListener('scroll', onScroll, { passive: true });
-        btn.onclick = function() {
-            scroller.scrollTo({ top: 0, behavior: 'smooth' });
-            window.parent.scrollTo({ top: 0, behavior: 'smooth' });
-        };
+        scroller.addEventListener('scroll', checkScroll, { passive: true });
+        window.parent.addEventListener('scroll', checkScroll, { passive: true });
+        doc.addEventListener('scroll', checkScroll, { passive: true });
+
+        btn.addEventListener('click', scrollTop);
+
+        // Poll as fallback (Streamlit rerenders can kill event listeners)
+        setInterval(checkScroll, 500);
     })();
     </script>
-    """,
-    unsafe_allow_html=True,
-)
 
 # ==============================================================================
 # RENDER HELPERS
